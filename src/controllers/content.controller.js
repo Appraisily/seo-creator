@@ -34,112 +34,68 @@ class ContentController {
         const schemaMessages = [
           {
             role: "assistant",
-            content: "You are an expert at analyzing search intent and creating optimal content structures. Your task is to determine the best JSON schema for content based on the keyword's intent."
+            content: "You are an expert at analyzing search intent and creating optimal content structures. Your task is to create a schema template with clear instructions for each section based on the keyword's intent."
           },
           {
             role: "user",
             content: `Analyze this keyword: "${data.keyword}"
 
-Based on the search intent, create a JSON schema that best serves the user's needs. The schema structure should be specifically designed for the type of content required.
+For this KW we need a JSON structure of the best posible SEO article to rank exceptional on Google. You have to create the structure of the JSON with what you think it will be the best structure for the given KW. You can change the JSON structure, in fact, it is encouraged. The idea is you have total flexibility to change this, but keeping it in a JSON format that matches what you would expect for a wordpress post.
 
-Here's an example schema for reference, but DO NOT copy it exactly - adapt the structure based on the keyword's intent:
+Example schema structure (DO NOT copy exactly - adapt based on intent):
 
 {
-  "post": {
-    "keyword": "YOUR_KEYWORD_HERE",
-    "slug": "your-keyword-here",
-    "title": "SEO-Optimized Title Including Your Keyword",
-    "meta_description": "SEO-friendly meta description of 140–160 characters including your primary keyword.",
-    
-    "images": [
-      {
-        "label": "featured_image",
-        "image_prompt": "Describe the exact image you'd like to generate using AI (e.g., style, color, background, subject).",
-        "suggested_alt_text": "Short, descriptive alt text including your keyword if appropriate.",
-        "suggested_title": "Optional image title attribute."
-      }
-    ],
-
-    "introduction": "Introductory paragraph(s) that includes the keyword in the first 100 words.",
-    
-    "body": [
-      {
-        "heading": "H2 or H3 Subheading – Variation or Related Keyword",
-        "content": "Discuss your sub-topic or supporting details here."
-      }
-    ],
-    
-    "faq_section": [
-      {
-        "question": "Related FAQ #1",
-        "answer": "Short, concise answer referencing your keyword naturally."
-      }
-    ],
-
-    "additional_info": {
-      "tips": [
-        "Bullet point tip 1",
-        "Bullet point tip 2"
+  "schema_info": {
+    "intent_type": "Describe the primary search intent (e.g., valuation, biography, how-to)",
+    "content_goal": "Explain what the content should achieve",
+    "target_audience": "Define who this content is for",
+    "key_focus_areas": [
+      "List main topics that must be covered",
+      "Based on search intent"
+    ]
+  },
+  "content_structure": {
+    "title": {
+      "format": "How the title should be structured",
+      "requirements": [
+        "List specific requirements for the title",
+        "E.g., include keyword, length limits"
       ],
-      "external_links": [
-        {
-          "url": "https://example.com/relevant-resource",
-          "anchor_text": "Descriptive anchor text"
-        }
+      "examples": [
+        "Example title formats"
       ]
     },
-
-    "conclusion": "Summary paragraph with call-to-action.",
-
-    "related_keywords": [
-      "synonym or related phrase 1",
-      "synonym or related phrase 2"
-    ],
-
-    "schema_markup": {
-      "article_type": "BlogPosting",
-      "author": "Your Name or Brand",
-      "publisher": "Your Company or Website",
-      "datePublished": "YYYY-MM-DD",
-      "dateModified": "YYYY-MM-DD"
-    }
+    "meta_description": {
+      "format": "How to structure the meta description",
+      "requirements": [
+        "List meta description requirements",
+        "E.g., length, keyword placement"
+      ]
+    },
+    "sections": [
+      {
+        "name": "Section name",
+        "purpose": "What this section should achieve",
+        "required_elements": [
+          "List what must be included"
+        ],
+        "guidelines": [
+          "Specific instructions for writing this section"
+        ]
+      }
+    ]
   }
 }
 
-Modify the schema based on intent type:
-1. Product/Artwork Valuation:
-   - Add price range sections
-   - Include market analysis
-   - Add value factors
-   - Include authentication tips
-
-2. Artist/Creator Biography:
-   - Add timeline sections
-   - Include notable works
-   - Add style evolution
-   - Include exhibitions/awards
-
-3. How-to/Guides:
-   - Add step-by-step sections
-   - Include materials/tools needed
-   - Add difficulty level
-   - Include time estimates
-
-4. Reviews/Comparisons:
-   - Add pros/cons sections
-   - Include rating criteria
-   - Add alternatives comparison
-   - Include price comparisons
-
 IMPORTANT:
 - Return ONLY valid JSON
+- Include clear instructions for each section
+- Focus on STRUCTURE and REQUIREMENTS, not content
+- Provide guidelines for content creation
+- NO placeholder content
 - NO markdown
 - NO code blocks
-- NO additional text
-- Include clear placeholder values
-- Structure must match the content needs
-- Remove unnecessary sections
-- Add relevant sections based on intent`
+- NO additional text`
           }
         ];
 
@@ -151,7 +107,7 @@ IMPORTANT:
 
         const schemaContent = schemaCompletion.data.choices[0].message.content;
         console.log('[CONTENT] Schema generation complete, length:', schemaContent.length);
-        console.log('\n[CONTENT] Generated Schema:');
+        console.log('\n[CONTENT] Generated Schema Template:');
         console.log('----------------------------------------');
         console.log(schemaContent);
         console.log('----------------------------------------\n');
@@ -160,7 +116,7 @@ IMPORTANT:
         let contentSchema;
         try {
           contentSchema = JSON.parse(schemaContent);
-          console.log('[CONTENT] Successfully parsed schema JSON');
+          console.log('[CONTENT] Successfully parsed schema template');
           console.log('[CONTENT] Schema structure:', {
             rootKeys: Object.keys(contentSchema),
             depth: this.getObjectDepth(contentSchema),
@@ -169,35 +125,36 @@ IMPORTANT:
         } catch (parseError) {
           console.error('[CONTENT] Schema parsing error:', parseError);
           console.error('[CONTENT] Raw schema:', schemaContent);
-          throw new Error('Invalid JSON schema from OpenAI');
+          throw new Error('Invalid JSON schema template from OpenAI');
         }
 
         // Phase 2: Fill the schema with actual content
-        console.log('[CONTENT] Phase 2: Generating content based on schema');
+        console.log('[CONTENT] Phase 2: Generating content based on schema template');
         const contentMessages = [
           {
             role: "assistant",
-            content: "You are an expert SEO content creator. Your task is to fill the provided content schema with high-quality, relevant information based on the keyword."
+            content: "You are an expert SEO content creator. Your task is to create content following the provided schema template and its instructions."
           },
           {
             role: "user",
-            content: `Create comprehensive content for the keyword "${data.keyword}" using exactly this JSON schema:
+            content: `Create comprehensive content for the keyword "${data.keyword}" following this schema template and its instructions:
 
 ${JSON.stringify(contentSchema, null, 2)}
 
 Requirements:
-1. Follow the schema structure exactly
-2. Replace all placeholder values with real, relevant content
-3. Ensure all content is factual and well-researched
-4. Include the keyword naturally throughout the content
-5. Maintain proper formatting and HTML where indicated
+1. Follow ALL instructions in the schema template
+2. Create content that matches each section's requirements
+3. Ensure content meets the specified goals and guidelines
+4. Include the keyword naturally throughout
+5. Follow any formatting requirements specified
 
 IMPORTANT:
 - Return ONLY valid JSON
+- Follow the schema structure exactly
+- Create content that fulfills each section's purpose
 - NO markdown
 - NO code blocks
-- NO additional text
-- Must match the schema structure exactly`
+- NO additional text`
           }
         ];
 
@@ -241,7 +198,7 @@ IMPORTANT:
           processed: [{
             keyword: data.keyword,
             status: 'success',
-            schema: contentSchema,
+            schema_template: contentSchema,
             content: parsedContent
           }]
         };
@@ -291,7 +248,7 @@ IMPORTANT:
     }
   }
 
-  // Helper method to get object depth
+  // Helper methods remain unchanged
   getObjectDepth(obj, depth = 0) {
     if (!obj || typeof obj !== 'object') {
       return depth;
@@ -301,12 +258,10 @@ IMPORTANT:
     );
   }
 
-  // Helper method to validate content against schema
   validateAgainstSchema(content, schema) {
     const schemaKeys = this.getAllKeys(schema);
     const contentKeys = this.getAllKeys(content);
     
-    // Check if all schema keys exist in content
     const missingKeys = schemaKeys.filter(key => !contentKeys.includes(key));
     
     console.log('[CONTENT] Schema validation:', {
@@ -318,7 +273,6 @@ IMPORTANT:
     return missingKeys.length === 0;
   }
 
-  // Helper method to get all keys from nested object
   getAllKeys(obj, prefix = '') {
     return Object.entries(obj).reduce((keys, [key, value]) => {
       const newKey = prefix ? `${prefix}.${key}` : key;
