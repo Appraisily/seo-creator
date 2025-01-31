@@ -36,10 +36,10 @@ class ContentController {
       try {
         console.log('[CONTENT] Preparing OpenAI request');
         
-        // Create completion with o1-mini
+        // Create completion with o1-mini - using assistant role instead of system
         const messages = [
           {
-            role: "system",
+            role: "assistant",
             content: "You are an expert SEO content creator. Your task is to create comprehensive, SEO-optimized blog post content based on the provided keyword. Return ONLY valid JSON matching the specified structure."
           },
           {
