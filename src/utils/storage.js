@@ -13,73 +13,56 @@ class ContentStorage {
       const [bucket] = await this.storage.bucket(this.bucketName).get();
       this.bucket = bucket;
       console.log('[STORAGE] Successfully initialized bucket:', this.bucketName);
-      console.log('[STORAGE] Bucket metadata:', bucket.metadata);
       return true;
     } catch (error) {
       console.error('[STORAGE] Initialization failed for bucket:', this.bucketName);
-      console.error('[STORAGE] Error details:', {
-        message: error.message,
-        code: error.code,
-        stack: error.stack
-      });
       throw error;
     }
   }
 
-  async storeContent(postId, content, type = 'original') {
+  async storeContent(filePath, content, metadata = {}) {
     console.log('[STORAGE] Starting content storage process:', {
-      postId,
-      type,
-      contentSize: JSON.stringify(content).length
+      filePath,
+      contentSize: JSON.stringify(content).length,
+      metadata
     });
 
-    const timestamp = Date.now();
-    const version = type.includes('enhanced') ? `-${type.split('-')[1] || 'v1'}` : '';
-    const fileName = `seo_content/${postId}/${type}${version}-${timestamp}.json`;
-    console.log('[STORAGE] Generated filename:', fileName);
-
-    const file = this.bucket.file(fileName);
+    const file = this.bucket.file(filePath);
     
-    const metadata = {
+    const fileMetadata = {
       contentType: 'application/json',
       metadata: {
-        postId,
-        type,
-        version: version || 'original',
         timestamp: new Date().toISOString(),
         contentLength: JSON.stringify(content).length,
-        storagePath: fileName
+        storagePath: filePath,
+        ...metadata
       }
     };
 
     try {
-      console.log('[STORAGE] Attempting to save file with metadata:', metadata);
+      console.log('[STORAGE] Attempting to save file with metadata:', fileMetadata);
       await file.save(JSON.stringify(content, null, 2), {
-        metadata,
+        metadata: fileMetadata,
         resumable: false
       });
       
       console.log('[STORAGE] Successfully stored content:', {
-        fileName,
-        type,
-        postId,
-        timestamp: metadata.metadata.timestamp
+        filePath,
+        timestamp: fileMetadata.metadata.timestamp
       });
 
       // Verify the file was saved
       const [exists] = await file.exists();
       console.log('[STORAGE] File existence verification:', {
-        fileName,
+        filePath,
         exists,
         size: (await file.getMetadata())[0].size
       });
 
-      return fileName;
+      return filePath;
     } catch (error) {
       console.error('[STORAGE] Failed to store content:', {
-        fileName,
-        type,
-        postId,
+        filePath,
         error: {
           message: error.message,
           code: error.code,
@@ -90,17 +73,17 @@ class ContentStorage {
     }
   }
 
-  async getContent(fileName) {
-    console.log('[STORAGE] Attempting to retrieve content:', fileName);
+  async getContent(filePath) {
+    console.log('[STORAGE] Attempting to retrieve content:', filePath);
     
     try {
-      const file = this.bucket.file(fileName);
+      const file = this.bucket.file(filePath);
       
       // Check if file exists before attempting download
       const [exists] = await file.exists();
       if (!exists) {
-        console.error('[STORAGE] File not found:', fileName);
-        throw new Error(`File not found: ${fileName}`);
+        console.error('[STORAGE] File not found:', filePath);
+        throw new Error(`File not found: ${filePath}`);
       }
 
       console.log('[STORAGE] File found, retrieving content...');
@@ -108,7 +91,7 @@ class ContentStorage {
       
       const contentString = content.toString();
       console.log('[STORAGE] Content retrieved successfully:', {
-        fileName,
+        filePath,
         contentSize: contentString.length,
         isJson: this.isValidJson(contentString)
       });
@@ -116,7 +99,7 @@ class ContentStorage {
       return JSON.parse(contentString);
     } catch (error) {
       console.error('[STORAGE] Error retrieving content:', {
-        fileName,
+        filePath,
         error: {
           message: error.message,
           code: error.code,

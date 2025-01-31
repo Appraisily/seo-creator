@@ -1,5 +1,7 @@
 const sheetsService = require('../services/sheets.service');
 const openaiService = require('../services/openai.service');
+const composerService = require('../services/composer.service');
+const contentStorage = require('../utils/storage');
 
 class ContentController {
   async processContent(req, res) {
@@ -22,11 +24,12 @@ class ContentController {
         });
       }
 
+      // Create keyword-specific folder path
+      const keywordSlug = data.keyword.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const basePath = `seo/keywords/${keywordSlug}`;
+      
       console.log('[CONTENT] Processing keyword:', data.keyword);
-      console.log('[CONTENT] Row data:', {
-        rowNumber: data.rowNumber,
-        keyword: data.keyword
-      });
+      console.log('[CONTENT] Storage path:', basePath);
 
       try {
         // Phase 1: Get JSON schema based on keyword intent
@@ -41,51 +44,6 @@ class ContentController {
             content: `Analyze this keyword: "${data.keyword}"
 
 For this KW we need a JSON structure of the best posible SEO article to rank exceptional on Google. You have to create the structure of the JSON with what you think it will be the best structure for the given KW. You can change the JSON structure, in fact, it is encouraged. The idea is you have total flexibility to change this, but keeping it in a JSON format that matches what you would expect for a wordpress post.
-
-Example schema structure (DO NOT copy exactly - adapt based on intent):
-
-{
-  "schema_info": {
-    "intent_type": "Describe the primary search intent (e.g., valuation, biography, how-to)",
-    "content_goal": "Explain what the content should achieve",
-    "target_audience": "Define who this content is for",
-    "key_focus_areas": [
-      "List main topics that must be covered",
-      "Based on search intent"
-    ]
-  },
-  "content_structure": {
-    "title": {
-      "format": "How the title should be structured",
-      "requirements": [
-        "List specific requirements for the title",
-        "E.g., include keyword, length limits"
-      ],
-      "examples": [
-        "Example title formats"
-      ]
-    },
-    "meta_description": {
-      "format": "How to structure the meta description",
-      "requirements": [
-        "List meta description requirements",
-        "E.g., length, keyword placement"
-      ]
-    },
-    "sections": [
-      {
-        "name": "Section name",
-        "purpose": "What this section should achieve",
-        "required_elements": [
-          "List what must be included"
-        ],
-        "guidelines": [
-          "Specific instructions for writing this section"
-        ]
-      }
-    ]
-  }
-}
 
 IMPORTANT:
 - Return ONLY valid JSON
@@ -107,71 +65,20 @@ IMPORTANT:
 
         const schemaContent = schemaCompletion.data.choices[0].message.content;
         console.log('[CONTENT] Schema generation complete, length:', schemaContent.length);
-        console.log('\n[CONTENT] Generated Schema Template:');
-        console.log('----------------------------------------');
-        console.log(schemaContent);
-        console.log('----------------------------------------\n');
 
-        // Parse the schema to pass to content generation
-        let contentSchema;
-        try {
-          contentSchema = JSON.parse(schemaContent);
-        } catch (parseError) {
-          console.error('[CONTENT] Schema parsing error:', parseError);
-          throw new Error('Invalid JSON schema template from OpenAI');
-        }
-
-        // Phase 2: Fill the schema with actual content
-        console.log('[CONTENT] Phase 2: Generating content based on schema template');
-        const contentMessages = [
+        // Store schema
+        await contentStorage.storeContent(
+          `${basePath}/schema.json`,
+          JSON.parse(schemaContent),
           {
-            role: "assistant",
-            content: "You are an expert SEO content creator. Your task is to create content following the provided schema template and its instructions."
-          },
-          {
-            role: "user",
-            content: `Create comprehensive content for the keyword "${data.keyword}" following this schema template and its instructions:
-
-${JSON.stringify(contentSchema, null, 2)}
-
-Requirements:
-1. Follow ALL instructions in the schema template
-2. Create content that matches each section's requirements
-3. Ensure content meets the specified goals and guidelines
-4. Include the keyword naturally throughout
-5. Follow any formatting requirements specified
-
-IMPORTANT:
-- Return ONLY valid JSON
-- Follow the schema structure exactly
-- Create content that fulfills each section's purpose
-- NO markdown
-- NO code blocks
-- NO additional text`
+            type: 'schema',
+            keyword: data.keyword,
+            timestamp: new Date().toISOString()
           }
-        ];
+        );
 
-        console.log('[CONTENT] Requesting content from o1-mini');
-        const contentCompletion = await openaiService.openai.createChatCompletion({
-          model: 'o1-mini',
-          messages: contentMessages
-        });
-
-        const generatedContent = contentCompletion.data.choices[0].message.content;
-        console.log('[CONTENT] Content generation complete, length:', generatedContent.length);
-        console.log('\n[CONTENT] Generated Content:');
-        console.log('----------------------------------------');
-        console.log(generatedContent);
-        console.log('----------------------------------------\n');
-
-        // Parse the final content
-        let parsedContent;
-        try {
-          parsedContent = JSON.parse(generatedContent);
-        } catch (parseError) {
-          console.error('[CONTENT] Content parsing error:', parseError);
-          throw new Error('Invalid JSON content from OpenAI');
-        }
+        // Mark as processed in sheets
+        await sheetsService.markPostAsProcessed(data, 'success');
 
         // Send successful response
         const response = {
@@ -183,29 +90,18 @@ IMPORTANT:
           },
           processed: [{
             keyword: data.keyword,
-            status: 'success',
-            content: parsedContent
+            status: 'schema_generated',
+            storagePath: `${basePath}/schema.json`
           }]
         };
 
-        console.log('[CONTENT] Sending successful response');
+        console.log('[CONTENT] Schema generation complete, stored at:', `${basePath}/schema.json`);
         return res.json(response);
 
       } catch (error) {
-        console.error('[CONTENT] Error generating content:', {
-          error: error.message,
-          stack: error.stack,
-          keyword: data.keyword
-        });
-
-        if (error.response) {
-          console.error('[CONTENT] OpenAI API error details:', {
-            status: error.response.status,
-            statusText: error.response.statusText,
-            data: error.response.data
-          });
-        }
-
+        console.error('[CONTENT] Error generating schema:', error);
+        
+        // Store error log
         const errorResponse = { 
           success: false, 
           error: error.message,
@@ -213,23 +109,144 @@ IMPORTANT:
           timestamp: new Date().toISOString()
         };
 
-        console.log('[CONTENT] Sending error response:', errorResponse);
+        await contentStorage.storeContent(
+          `seo/logs/${new Date().toISOString().split('T')[0]}/errors.json`,
+          errorResponse,
+          {
+            type: 'error_log',
+            keyword: data.keyword
+          }
+        );
+
+        // Mark as failed in sheets
+        await sheetsService.markPostAsProcessed(data, 'error', error.message);
+
         return res.status(500).json(errorResponse);
       }
     } catch (error) {
-      console.error('[CONTENT] Error in process controller:', {
-        error: error.message,
-        stack: error.stack
+      console.error('[CONTENT] Error in process controller:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  }
+
+  async generateContent(req, res) {
+    try {
+      const { keyword } = req.body;
+      
+      if (!keyword) {
+        return res.status(400).json({
+          success: false,
+          error: 'Keyword is required'
+        });
+      }
+
+      const keywordSlug = keyword.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const basePath = `seo/keywords/${keywordSlug}`;
+
+      // Get the schema
+      const schema = await contentStorage.getContent(`${basePath}/schema.json`);
+      
+      // Generate content based on schema
+      const contentMessages = [
+        {
+          role: "assistant",
+          content: "You are an expert content creator specializing in SEO-optimized articles. Your task is to generate content following the provided schema structure."
+        },
+        {
+          role: "user",
+          content: `Generate content for keyword "${keyword}" following this schema:
+${JSON.stringify(schema, null, 2)}
+
+IMPORTANT:
+- Follow the schema structure exactly
+- Create engaging, informative content
+- Optimize for SEO
+- Return valid JSON only
+- NO markdown
+- NO code blocks
+- NO additional text`
+        }
+      ];
+
+      const contentCompletion = await openaiService.openai.createChatCompletion({
+        model: 'o1-mini',
+        messages: contentMessages
       });
 
-      const errorResponse = { 
-        success: false, 
-        error: error.message,
-        timestamp: new Date().toISOString()
-      };
+      const generatedContent = contentCompletion.data.choices[0].message.content;
 
-      console.log('[CONTENT] Sending error response:', errorResponse);
-      res.status(500).json(errorResponse);
+      // Store generated content
+      await contentStorage.storeContent(
+        `${basePath}/content.json`,
+        JSON.parse(generatedContent),
+        {
+          type: 'content',
+          keyword,
+          timestamp: new Date().toISOString()
+        }
+      );
+
+      return res.json({
+        success: true,
+        keyword,
+        storagePath: `${basePath}/content.json`
+      });
+
+    } catch (error) {
+      console.error('[CONTENT] Error generating content:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  async composeHtml(req, res) {
+    try {
+      const { keyword } = req.body;
+      
+      if (!keyword) {
+        return res.status(400).json({
+          success: false,
+          error: 'Keyword is required'
+        });
+      }
+
+      const keywordSlug = keyword.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const basePath = `seo/keywords/${keywordSlug}`;
+
+      // Get the content
+      const content = await contentStorage.getContent(`${basePath}/content.json`);
+      
+      // Generate HTML using composer service
+      const composedHtml = await composerService.composeHtml(content);
+
+      // Store HTML result
+      await contentStorage.storeContent(
+        `${basePath}/html.json`,
+        composedHtml,
+        {
+          type: 'html',
+          keyword,
+          timestamp: new Date().toISOString()
+        }
+      );
+
+      return res.json({
+        success: true,
+        keyword,
+        storagePath: `${basePath}/html.json`
+      });
+
+    } catch (error) {
+      console.error('[CONTENT] Error composing HTML:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
     }
   }
 }
