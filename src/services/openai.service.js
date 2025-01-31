@@ -20,6 +20,50 @@ class OpenAIService {
     }
   }
 
+  async generateImage(prompt, size = "1024x1024") {
+    if (!this.isInitialized) {
+      throw new Error('OpenAI service not initialized');
+    }
+
+    try {
+      console.log('[OPENAI] Generating image with prompt:', prompt);
+      
+      const response = await this.openai.createImage({
+        model: "dall-e-3",
+        prompt,
+        n: 1,
+        size,
+        quality: "standard",
+        response_format: "url"
+      });
+
+      if (!response.data || !response.data.data || !response.data.data[0] || !response.data.data[0].url) {
+        throw new Error('Invalid response from DALL-E 3');
+      }
+
+      const imageUrl = response.data.data[0].url;
+      console.log('[OPENAI] Successfully generated image:', imageUrl);
+      
+      return {
+        success: true,
+        url: imageUrl
+      };
+    } catch (error) {
+      console.error('[OPENAI] Error generating image:', error);
+      
+      // Log detailed API error if available
+      if (error.response) {
+        console.error('[OPENAI] API error details:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data
+        });
+      }
+
+      throw new Error(`Failed to generate image: ${error.message}`);
+    }
+  }
+
   async enhanceContent(prompt, keyword, version = 'v1') {
     if (!this.isInitialized) {
       throw new Error('OpenAI service not initialized');

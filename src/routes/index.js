@@ -1,10 +1,97 @@
 const express = require('express');
 const contentController = require('../controllers/content.controller');
 const openaiService = require('../services/openai.service');
+const composerService = require('../services/composer.service');
 
 const router = express.Router();
 
 router.post('/process', contentController.processContent);
+
+// Debug endpoint for testing HTML composition
+router.post('/debug/compose-html', async (req, res) => {
+  try {
+    const { content } = req.body;
+    
+    if (!content) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Content JSON is required' 
+      });
+    }
+
+    console.log('[DEBUG] Starting HTML composition with content');
+    const result = await composerService.composeHtml(content);
+    
+    res.json({
+      success: true,
+      result
+    });
+  } catch (error) {
+    console.error('[DEBUG] HTML composition error:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      error: error.response?.data?.error
+    });
+    
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      details: {
+        message: error.response?.data?.error?.message,
+        type: error.response?.data?.error?.type,
+        code: error.response?.data?.error?.code
+      }
+    });
+  }
+});
+
+// Debug endpoint for testing image generation
+router.post('/debug/generate-image', async (req, res) => {
+  try {
+    const { prompt, size } = req.body;
+    
+    if (!prompt) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Prompt is required' 
+      });
+    }
+
+    console.log('[DEBUG] Starting image generation with prompt:', prompt);
+    console.log('[DEBUG] OpenAI service initialized:', openaiService.isInitialized);
+
+    const result = await openaiService.generateImage(prompt, size);
+    console.log('[DEBUG] Image generation successful');
+    
+    res.json({
+      success: true,
+      imageUrl: result.url,
+      prompt,
+      size: size || '1024x1024'
+    });
+  } catch (error) {
+    console.error('[DEBUG] Image generation error:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      error: error.response?.data?.error
+    });
+    
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      details: {
+        message: error.response?.data?.error?.message,
+        type: error.response?.data?.error?.type,
+        param: error.response?.data?.error?.param,
+        code: error.response?.data?.error?.code
+      }
+    });
+  }
+});
 
 // Debug endpoint for testing v3 enhancement
 router.post('/debug/v3-enhance', async (req, res) => {

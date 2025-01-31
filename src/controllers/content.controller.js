@@ -112,19 +112,12 @@ IMPORTANT:
         console.log(schemaContent);
         console.log('----------------------------------------\n');
 
-        // Parse and validate the schema
+        // Parse the schema to pass to content generation
         let contentSchema;
         try {
           contentSchema = JSON.parse(schemaContent);
-          console.log('[CONTENT] Successfully parsed schema template');
-          console.log('[CONTENT] Schema structure:', {
-            rootKeys: Object.keys(contentSchema),
-            depth: this.getObjectDepth(contentSchema),
-            sections: this.getAllKeys(contentSchema)
-          });
         } catch (parseError) {
           console.error('[CONTENT] Schema parsing error:', parseError);
-          console.error('[CONTENT] Raw schema:', schemaContent);
           throw new Error('Invalid JSON schema template from OpenAI');
         }
 
@@ -171,19 +164,12 @@ IMPORTANT:
         console.log(generatedContent);
         console.log('----------------------------------------\n');
 
-        // Parse and validate the final content
+        // Parse the final content
         let parsedContent;
         try {
           parsedContent = JSON.parse(generatedContent);
-          console.log('[CONTENT] Successfully parsed content JSON');
-          console.log('[CONTENT] Content validation:', {
-            matches_schema: this.validateAgainstSchema(parsedContent, contentSchema),
-            sections: this.getAllKeys(parsedContent),
-            contentLength: JSON.stringify(parsedContent).length
-          });
         } catch (parseError) {
           console.error('[CONTENT] Content parsing error:', parseError);
-          console.error('[CONTENT] Raw content:', generatedContent);
           throw new Error('Invalid JSON content from OpenAI');
         }
 
@@ -198,7 +184,6 @@ IMPORTANT:
           processed: [{
             keyword: data.keyword,
             status: 'success',
-            schema_template: contentSchema,
             content: parsedContent
           }]
         };
@@ -246,41 +231,6 @@ IMPORTANT:
       console.log('[CONTENT] Sending error response:', errorResponse);
       res.status(500).json(errorResponse);
     }
-  }
-
-  // Helper methods remain unchanged
-  getObjectDepth(obj, depth = 0) {
-    if (!obj || typeof obj !== 'object') {
-      return depth;
-    }
-    return Math.max(
-      ...Object.values(obj).map(val => this.getObjectDepth(val, depth + 1))
-    );
-  }
-
-  validateAgainstSchema(content, schema) {
-    const schemaKeys = this.getAllKeys(schema);
-    const contentKeys = this.getAllKeys(content);
-    
-    const missingKeys = schemaKeys.filter(key => !contentKeys.includes(key));
-    
-    console.log('[CONTENT] Schema validation:', {
-      schemaKeys: schemaKeys.length,
-      contentKeys: contentKeys.length,
-      missingKeys
-    });
-
-    return missingKeys.length === 0;
-  }
-
-  getAllKeys(obj, prefix = '') {
-    return Object.entries(obj).reduce((keys, [key, value]) => {
-      const newKey = prefix ? `${prefix}.${key}` : key;
-      if (value && typeof value === 'object' && !Array.isArray(value)) {
-        return [...keys, newKey, ...this.getAllKeys(value, newKey)];
-      }
-      return [...keys, newKey];
-    }, []);
   }
 }
 
