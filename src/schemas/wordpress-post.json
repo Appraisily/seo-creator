@@ -1,0 +1,168 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["title", "content", "meta", "schema"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Post title optimized for SEO"
+    },
+    "slug": {
+      "type": "string",
+      "description": "URL-friendly version of the title"
+    },
+    "meta": {
+      "type": "object",
+      "required": ["title", "description", "focus_keyword"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "SEO meta title"
+        },
+        "description": {
+          "type": "string",
+          "description": "SEO meta description"
+        },
+        "focus_keyword": {
+          "type": "string",
+          "description": "Primary keyword for SEO"
+        },
+        "secondary_keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of secondary keywords"
+        }
+      }
+    },
+    "content": {
+      "type": "object",
+      "required": ["html", "excerpt"],
+      "properties": {
+        "html": {
+          "type": "string",
+          "description": "Full HTML content of the post"
+        },
+        "excerpt": {
+          "type": "string",
+          "description": "Short description for listings and social sharing"
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "content"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["paragraph", "heading", "list", "image", "table", "quote"]
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 6,
+                "description": "Heading level (h1-h6) for heading type"
+              },
+              "content": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "images": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["url", "alt", "type"],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "alt": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["featured", "content", "social"]
+          },
+          "caption": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Original DALL-E prompt used to generate the image"
+          }
+        }
+      }
+    },
+    "schema": {
+      "type": "object",
+      "required": ["@context", "@type"],
+      "properties": {
+        "@context": {
+          "type": "string",
+          "const": "https://schema.org"
+        },
+        "@type": {
+          "type": "string",
+          "enum": ["Article", "BlogPosting", "WebPage"]
+        },
+        "headline": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "image": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "datePublished": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "dateModified": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "author": {
+          "type": "object",
+          "required": ["@type", "name"],
+          "properties": {
+            "@type": {
+              "type": "string",
+              "const": "Person"
+            },
+            "name": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "publish", "private"],
+      "default": "draft"
+    }
+  }
+}
