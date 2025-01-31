@@ -28,7 +28,7 @@ class SheetsService {
       // Verify access by trying to get sheet properties
       await this.sheets.spreadsheets.get({
         spreadsheetId: this.sheetsId,
-        ranges: ['KWs!A1:B1'],
+        ranges: ['SEO!A1:B1'],  // Updated to use SEO sheet
         fields: 'sheets.properties.title'
       });
 
@@ -47,36 +47,34 @@ class SheetsService {
     }
     
     try {
-      // Get all rows from the KWs sheet
+      // Get all rows from the SEO sheet
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.sheetsId,
-        range: 'KWs!A:E', // Columns: KWs, SEO Title, Post ID, Processed Date, Status
+        range: 'SEO!A:C', // Columns: Keywords, Processed Date, Status
       });
 
       const rows = response.data.values || [];
       if (rows.length <= 1) { // Only headers or empty
-        console.log('[SHEETS] No posts found in sheet');
+        console.log('[SHEETS] No keywords found in sheet');
         return null;
       }
 
       // Skip header row and find first unprocessed row
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        if (!row[3]) { // Column D (index 3) is empty - not processed
-          console.log('[SHEETS] Found unprocessed post in row:', i + 1);
+        if (!row[1]) { // Column B (index 1) is empty - not processed
+          console.log('[SHEETS] Found unprocessed keyword in row:', i + 1);
           return {
             keyword: row[0]?.trim() || '',
-            seoTitle: row[1]?.trim() || '',
-            postId: row[2]?.trim() || '',
             rowNumber: i + 1 // Actual spreadsheet row number (1-based)
           };
         }
       }
 
-      console.log('[SHEETS] No unprocessed posts found');
+      console.log('[SHEETS] No unprocessed keywords found');
       return null;
     } catch (error) {
-      console.error('[SHEETS] Error getting next unprocessed post:', error);
+      console.error('[SHEETS] Error getting next unprocessed keyword:', error);
       throw error;
     }
   }
@@ -89,10 +87,10 @@ class SheetsService {
     try {
       const rowNumber = post.rowNumber;
       if (!rowNumber) {
-        throw new Error('Row number not provided for post update');
+        throw new Error('Row number not provided for keyword update');
       }
 
-      // Prepare values for both processed date (D) and status (E) columns
+      // Prepare values for both processed date (B) and status (C) columns
       const processedDate = new Date().toISOString();
       const statusMessage = status === 'success' 
         ? 'Success'
@@ -105,7 +103,7 @@ class SheetsService {
           valueInputOption: 'USER_ENTERED',
           data: [
             {
-              range: `KWs!D${rowNumber}:E${rowNumber}`,
+              range: `SEO!B${rowNumber}:C${rowNumber}`,
               values: [[processedDate, statusMessage]]
             }
           ]
