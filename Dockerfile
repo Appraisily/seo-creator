@@ -2,6 +2,9 @@ FROM node:18-slim
 
 WORKDIR /usr/src/app
 
+# Set environment variables
+ENV PROJECT_ID=civil-forge-403609
+
 # Install dependencies
 COPY package*.json ./
 RUN npm install
