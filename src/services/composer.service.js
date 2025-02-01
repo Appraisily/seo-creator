@@ -89,7 +89,7 @@ IMPORTANT:
 
       console.log('[COMPOSER] Starting conversation with AI agent');
       let currentMessage = await openaiService.openai.createChatCompletion({
-        model: 'o1-mini',
+        model: 'o3-mini',
         messages: conversation,
         functions: functionDefinitions,
         function_call: 'auto'
