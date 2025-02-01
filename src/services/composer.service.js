@@ -7,30 +7,6 @@ class ComposerService {
       console.log('[COMPOSER] Starting HTML composition');
       console.log('[COMPOSER] Content JSON size:', JSON.stringify(contentJson).length);
       
-      // Function definition for image generation
-      const functionDefinitions = [
-        {
-          name: 'generateImage',
-          description: 'Generate an image using DALL-E 3',
-          parameters: {
-            type: 'object',
-            properties: {
-              prompt: {
-                type: 'string',
-                description: 'Detailed description of the image to generate'
-              },
-              size: {
-                type: 'string',
-                enum: ['1024x1024', '1792x1024', '1024x1792'],
-                description: 'Size of the image to generate',
-                default: '1024x1024'
-              }
-            },
-            required: ['prompt']
-          }
-        }
-      ];
-
       // Initialize conversation with the agent
       const conversation = [
         {
@@ -52,7 +28,7 @@ CRITICAL: You MUST return a valid JSON object with EXACTLY these fields:
   },
   "images": [
     {
-      "url": "image URL",
+      "url": "placeholder",
       "alt": "descriptive alt text"
     }
   ]
@@ -61,13 +37,13 @@ CRITICAL: You MUST return a valid JSON object with EXACTLY these fields:
 Key Requirements:
 1. Follow the JSON structure EXACTLY - include ONLY the specified fields
 2. Create semantic, accessible HTML content
-3. Generate appropriate images using the generateImage function
+3. Include placeholder image objects with descriptive alt text
 4. Optimize all elements for SEO
 
-Image Generation Guidelines:
-- Generate a featured image that captures the main topic
-- Create relevant section illustrations
-- Ensure all images have descriptive alt text
+Image Guidelines:
+- Include placeholders for a featured image and section illustrations
+- Provide detailed alt text for each image
+- Plan for 3-4 strategic image placements
 
 SEO Requirements:
 - Include focus keyword in title, meta title, and first paragraph
@@ -82,7 +58,7 @@ ${JSON.stringify(contentJson, null, 2)}
 
 IMPORTANT:
 - Return ONLY valid JSON with EXACTLY the specified fields
-- Generate appropriate images
+- Include image placeholders with descriptive alt text
 - Optimize for SEO
 - Use semantic HTML5 markup`
         }
@@ -90,112 +66,104 @@ IMPORTANT:
 
       console.log('[COMPOSER] Starting conversation with AI agent');
       let currentMessage = await openaiService.openai.createChatCompletion({
-        model: 'o3-mini', //o3-mini is the new model, do not change it
-        messages: conversation,
-        functions: functionDefinitions,
-        function_call: 'auto'
+        model: 'o3-mini',
+        messages: conversation
       });
 
       let response = currentMessage.data.choices[0].message;
-      let generatedImages = [];
-      let imageGenerationCount = 0;
 
-      // Handle function calls in a loop until the agent completes its task
-      while (response.function_call) {
-        const functionCall = response.function_call;
-        console.log('[COMPOSER] Agent requested function:', functionCall.name);
-
-        if (functionCall.name === 'generateImage') {
-          const args = JSON.parse(functionCall.arguments);
-          console.log('[COMPOSER] Generating image:', args.prompt);
-
-          // Log image generation request to cloud storage
-          const logEntry = {
-            timestamp: new Date().toISOString(),
-            event: 'image_generation_request',
-            prompt: args.prompt,
-            size: args.size || '1024x1024',
-            agent_conversation_length: conversation.length,
-            image_count: ++imageGenerationCount
-          };
-
-          // Store log in cloud storage
-          const logPath = `seo/logs/image_generation/${new Date().toISOString().split('T')[0]}/requests.json`;
-          await contentStorage.storeContent(
-            logPath,
-            logEntry,
-            {
-              type: 'image_generation_log',
-              timestamp: logEntry.timestamp
-            }
-          );
-
-          // Generate the image
-          const imageResult = await openaiService.generateImage(args.prompt, args.size);
-          console.log('[COMPOSER] Image generated:', imageResult.url);
-
-          // Log successful image generation
-          const successLogEntry = {
-            ...logEntry,
-            event: 'image_generation_success',
-            url: imageResult.url
-          };
-
-          await contentStorage.storeContent(
-            logPath.replace('requests.json', 'success.json'),
-            successLogEntry,
-            {
-              type: 'image_generation_log',
-              timestamp: new Date().toISOString()
-            }
-          );
-
-          // Store generated image info
-          generatedImages.push({
-            url: imageResult.url,
-            alt: args.prompt
-          });
-
-          // Add the function result to the conversation
-          conversation.push(response);
-          conversation.push({
-            role: 'function',
-            name: 'generateImage',
-            content: JSON.stringify({ url: imageResult.url })
-          });
-
-          // Continue the conversation
-          currentMessage = await openaiService.openai.createChatCompletion({
-            model: 'o1-mini',
-            messages: conversation,
-            functions: functionDefinitions,
-            function_call: 'auto'
-          });
-
-          response = currentMessage.data.choices[0].message;
-        }
-      }
-
-      // Parse the final response
-      console.log('[COMPOSER] Agent completed task, parsing final response');
-      let finalResult;
+      // Parse the response
+      console.log('[COMPOSER] Agent completed task, parsing response');
+      let composedContent;
       try {
-        finalResult = JSON.parse(response.content);
+        composedContent = JSON.parse(response.content);
         console.log('[COMPOSER] Successfully parsed response');
       } catch (error) {
-        console.error('[COMPOSER] Error parsing final response:', error);
+        console.error('[COMPOSER] Error parsing response:', error);
         console.error('[COMPOSER] Raw response:', response.content);
         throw new Error('Invalid JSON response from agent');
       }
 
-      // Add generated images to the result
-      finalResult.images = [...(finalResult.images || []), ...generatedImages];
+      // Generate images based on alt text
+      console.log('[COMPOSER] Starting image generation phase');
+      const enhancedContent = await this.generateImagesForContent(composedContent);
 
-      // Log final image generation summary
+      return {
+        success: true,
+        ...enhancedContent
+      };
+
+    } catch (error) {
+      console.error('[COMPOSER] Error in composition process:', {
+        message: error.message,
+        response: error.response?.data,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  async generateImagesForContent(content) {
+    try {
+      console.log('[COMPOSER] Generating images for content');
+      const generatedImages = [];
+
+      // Process each image placeholder
+      for (const image of content.images) {
+        console.log('[COMPOSER] Generating image from alt text:', image.alt);
+
+        // Log image generation request
+        const logEntry = {
+          timestamp: new Date().toISOString(),
+          event: 'image_generation_request',
+          prompt: image.alt,
+          size: '1024x1024'
+        };
+
+        await contentStorage.storeContent(
+          `seo/logs/image_generation/${new Date().toISOString().split('T')[0]}/requests.json`,
+          logEntry,
+          {
+            type: 'image_generation_log',
+            timestamp: logEntry.timestamp
+          }
+        );
+
+        // Generate image using the alt text as prompt
+        const imageResult = await openaiService.generateImage(image.alt);
+        console.log('[COMPOSER] Image generated:', imageResult.url);
+
+        // Log successful generation
+        const successLogEntry = {
+          ...logEntry,
+          event: 'image_generation_success',
+          url: imageResult.url
+        };
+
+        await contentStorage.storeContent(
+          `seo/logs/image_generation/${new Date().toISOString().split('T')[0]}/success.json`,
+          successLogEntry,
+          {
+            type: 'image_generation_log',
+            timestamp: new Date().toISOString()
+          }
+        );
+
+        // Add generated image to the list
+        generatedImages.push({
+          url: imageResult.url,
+          alt: image.alt
+        });
+      }
+
+      // Replace placeholder images with generated ones
+      content.images = generatedImages;
+
+      // Log generation summary
       const summaryLogEntry = {
         timestamp: new Date().toISOString(),
         event: 'image_generation_summary',
-        total_images_generated: imageGenerationCount,
+        total_images_generated: generatedImages.length,
         images: generatedImages
       };
 
@@ -208,13 +176,9 @@ IMPORTANT:
         }
       );
 
-      return {
-        success: true,
-        ...finalResult
-      };
-
+      return content;
     } catch (error) {
-      // Log error if image generation fails
+      // Log error
       const errorLogEntry = {
         timestamp: new Date().toISOString(),
         event: 'image_generation_error',
@@ -233,11 +197,6 @@ IMPORTANT:
         }
       );
 
-      console.error('[COMPOSER] Error in composition process:', {
-        message: error.message,
-        response: error.response?.data,
-        stack: error.stack
-      });
       throw error;
     }
   }
