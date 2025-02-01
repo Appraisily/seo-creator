@@ -1,4 +1,5 @@
 const openaiService = require('./openai.service');
+const contentStorage = require('../utils/storage');
 
 class ComposerService {
   async composeHtml(contentJson) {
@@ -89,7 +90,7 @@ IMPORTANT:
 
       console.log('[COMPOSER] Starting conversation with AI agent');
       let currentMessage = await openaiService.openai.createChatCompletion({
-        model: 'o3-mini',
+        model: 'o3-mini', //o3-mini is the new model, do not change it
         messages: conversation,
         functions: functionDefinitions,
         function_call: 'auto'
@@ -97,6 +98,7 @@ IMPORTANT:
 
       let response = currentMessage.data.choices[0].message;
       let generatedImages = [];
+      let imageGenerationCount = 0;
 
       // Handle function calls in a loop until the agent completes its task
       while (response.function_call) {
@@ -107,9 +109,46 @@ IMPORTANT:
           const args = JSON.parse(functionCall.arguments);
           console.log('[COMPOSER] Generating image:', args.prompt);
 
+          // Log image generation request to cloud storage
+          const logEntry = {
+            timestamp: new Date().toISOString(),
+            event: 'image_generation_request',
+            prompt: args.prompt,
+            size: args.size || '1024x1024',
+            agent_conversation_length: conversation.length,
+            image_count: ++imageGenerationCount
+          };
+
+          // Store log in cloud storage
+          const logPath = `seo/logs/image_generation/${new Date().toISOString().split('T')[0]}/requests.json`;
+          await contentStorage.storeContent(
+            logPath,
+            logEntry,
+            {
+              type: 'image_generation_log',
+              timestamp: logEntry.timestamp
+            }
+          );
+
           // Generate the image
           const imageResult = await openaiService.generateImage(args.prompt, args.size);
           console.log('[COMPOSER] Image generated:', imageResult.url);
+
+          // Log successful image generation
+          const successLogEntry = {
+            ...logEntry,
+            event: 'image_generation_success',
+            url: imageResult.url
+          };
+
+          await contentStorage.storeContent(
+            logPath.replace('requests.json', 'success.json'),
+            successLogEntry,
+            {
+              type: 'image_generation_log',
+              timestamp: new Date().toISOString()
+            }
+          );
 
           // Store generated image info
           generatedImages.push({
@@ -152,12 +191,48 @@ IMPORTANT:
       // Add generated images to the result
       finalResult.images = [...(finalResult.images || []), ...generatedImages];
 
+      // Log final image generation summary
+      const summaryLogEntry = {
+        timestamp: new Date().toISOString(),
+        event: 'image_generation_summary',
+        total_images_generated: imageGenerationCount,
+        images: generatedImages
+      };
+
+      await contentStorage.storeContent(
+        `seo/logs/image_generation/${new Date().toISOString().split('T')[0]}/summary.json`,
+        summaryLogEntry,
+        {
+          type: 'image_generation_summary',
+          timestamp: summaryLogEntry.timestamp
+        }
+      );
+
       return {
         success: true,
         ...finalResult
       };
 
     } catch (error) {
+      // Log error if image generation fails
+      const errorLogEntry = {
+        timestamp: new Date().toISOString(),
+        event: 'image_generation_error',
+        error: {
+          message: error.message,
+          stack: error.stack
+        }
+      };
+
+      await contentStorage.storeContent(
+        `seo/logs/image_generation/${new Date().toISOString().split('T')[0]}/errors.json`,
+        errorLogEntry,
+        {
+          type: 'image_generation_error',
+          timestamp: errorLogEntry.timestamp
+        }
+      );
+
       console.error('[COMPOSER] Error in composition process:', {
         message: error.message,
         response: error.response?.data,
