@@ -60,35 +60,96 @@ images_free_reports/
 
 ## Content Generation Process
 
-### 1. Schema Generation
-```bash
-curl -X POST https://seo-creator-856401495068.us-central1.run.app/api/process
-```
-- Fetches next unprocessed keyword from Google Sheets
-- Generates optimal content structure based on keyword intent
-- Stores schema in `seo/keywords/{keyword-slug}/schema.json`
+### Step-by-Step SEO Content Creation
 
-### 2. Content Generation
-```bash
-curl -X POST https://seo-creator-856401495068.us-central1.run.app/api/generate-content \
-  -H "Content-Type: application/json" \
-  -d '{"keyword": "your-keyword-here"}'
-```
-- Reads schema from storage
-- Generates SEO-optimized content following the schema
-- Stores content in `seo/keywords/{keyword-slug}/content.json`
+1. **Keyword Processing** (`/api/process`)
+   ```bash
+   curl -X POST https://seo-creator-856401495068.us-central1.run.app/api/process
+   ```
+   - Fetches next unprocessed keyword from Google Sheets
+   - Analyzes keyword intent and search volume
+   - Creates optimal content structure based on analysis
+   - Stores schema in `seo/keywords/{keyword-slug}/schema.json`
 
-### 3. HTML Composition
-```bash
-curl -X POST https://seo-creator-856401495068.us-central1.run.app/api/compose-html \
-  -H "Content-Type: application/json" \
-  -d '{"keyword": "your-keyword-here"}'
+2. **Content Generation** (`/api/generate-content`)
+   ```bash
+   curl -X POST https://seo-creator-856401495068.us-central1.run.app/api/generate-content \
+     -H "Content-Type: application/json" \
+     -d '{"keyword": "your-keyword-here"}'
+   ```
+   - Reads schema from storage
+   - Generates SEO-optimized content following the schema
+   - Includes:
+     - Meta title and description
+     - Focus keyword placement
+     - Semantic HTML structure
+     - Image placeholders with alt text
+   - Stores content in `seo/keywords/{keyword-slug}/content.json`
+
+3. **HTML Composition** (`/api/compose-html`)
+   ```bash
+   curl -X POST https://seo-creator-856401495068.us-central1.run.app/api/compose-html \
+     -H "Content-Type: application/json" \
+     -d '{"keyword": "your-keyword-here"}'
+   ```
+   - Reads generated content
+   - Creates semantic HTML structure
+   - Generates AI images using DALL-E 3
+   - Adds schema.org markup
+   - Stores result in `seo/keywords/{keyword-slug}/html.json`
+
+4. **WordPress Publishing** (`/api/test/wordpress`)
+   ```bash
+   curl -X POST https://seo-creator-856401495068.us-central1.run.app/api/test/wordpress
+   ```
+   - Takes composed HTML content
+   - Uploads generated images to WordPress
+   - Creates new WordPress post with:
+     - SEO meta information
+     - Featured image
+     - Structured content
+     - Schema.org markup
+   - Returns WordPress post URL and ID
+
+### Content Structure
+The generated content follows this structure:
+```json
+{
+  "title": "SEO-optimized title",
+  "slug": "url-friendly-slug",
+  "meta": {
+    "title": "Meta title for SEO",
+    "description": "Meta description with call-to-action",
+    "focus_keyword": "primary keyword"
+  },
+  "content": {
+    "html": "Full HTML content"
+  },
+  "images": [
+    {
+      "url": "image-url",
+      "alt": "descriptive alt text"
+    }
+  ]
+}
 ```
-- Reads generated content
-- Creates semantic HTML structure
-- Generates and integrates AI images
-- Adds schema.org markup
-- Stores result in `seo/keywords/{keyword-slug}/html.json`
+
+### Testing Content Generation
+1. Process a single keyword:
+   ```bash
+   curl -X POST https://seo-creator-856401495068.us-central1.run.app/api/process
+   ```
+
+2. Generate content for a specific keyword:
+   ```bash
+   curl -X POST https://seo-creator-856401495068.us-central1.run.app/api/generate-content \
+     -d '{"keyword":"elgin antique pocket watch value"}'
+   ```
+
+3. Test WordPress publishing:
+   ```bash
+   curl -X POST https://seo-creator-856401495068.us-central1.run.app/api/test/wordpress
+   ```
 
 ## Configuration
 
@@ -119,6 +180,9 @@ Generates content based on the stored schema.
 
 ### POST /api/compose-html
 Creates the final HTML post with AI-generated images.
+
+### POST /api/test/wordpress
+Tests WordPress post creation with sample content.
 
 ### GET /health
 Health check endpoint that returns:

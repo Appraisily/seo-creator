@@ -1,5 +1,6 @@
 const openaiService = require('./openai.service');
 const contentStorage = require('../utils/storage');
+const wordpressService = require('./wordpress');
 
 class ComposerService {
   async composeHtml(contentJson) {
@@ -7,90 +8,20 @@ class ComposerService {
       console.log('[COMPOSER] Starting HTML composition');
       console.log('[COMPOSER] Content JSON size:', JSON.stringify(contentJson).length);
       
-      // Initialize conversation with the agent
-      const conversation = [
-        {
-          role: 'assistant',
-          content: `You are an expert WordPress content composer specializing in SEO-optimized articles. Your task is to transform the provided content into a structured WordPress post format.
+      // First, generate the initial structure to get image requirements
+      const initialStructure = await this.generateInitialStructure(contentJson);
+      
+      // Generate and upload images first
+      console.log('[COMPOSER] Starting image generation and upload phase');
+      const wordpressImages = await this.generateAndUploadImages(initialStructure.images);
 
-CRITICAL: You MUST return a valid JSON object with EXACTLY these fields:
-
-{
-  "title": "SEO-optimized post title",
-  "slug": "url-friendly-slug",
-  "meta": {
-    "title": "SEO meta title",
-    "description": "Compelling meta description",
-    "focus_keyword": "primary keyword"
-  },
-  "content": {
-    "html": "Full HTML content with semantic markup"
-  },
-  "images": [
-    {
-      "url": "placeholder",
-      "alt": "descriptive alt text"
-    }
-  ]
-}
-
-Key Requirements:
-1. Follow the JSON structure EXACTLY - include ONLY the specified fields
-2. Create semantic, accessible HTML content
-3. Include placeholder image objects with descriptive alt text
-4. Optimize all elements for SEO
-
-Image Guidelines:
-- Include placeholders for a featured image and section illustrations
-- Provide detailed alt text for each image
-- Plan for 3-4 strategic image placements
-
-SEO Requirements:
-- Include focus keyword in title, meta title, and first paragraph
-- Create compelling meta descriptions with call-to-action
-- Use semantic HTML5 elements (article, section, etc.)
-- Structure content with proper heading hierarchy`
-        },
-        {
-          role: 'user',
-          content: `Transform this content into a WordPress post format:
-${JSON.stringify(contentJson, null, 2)}
-
-IMPORTANT:
-- Return ONLY valid JSON with EXACTLY the specified fields
-- Include image placeholders with descriptive alt text
-- Optimize for SEO
-- Use semantic HTML5 markup`
-        }
-      ];
-
-      console.log('[COMPOSER] Starting conversation with AI agent');
-      let currentMessage = await openaiService.openai.createChatCompletion({
-        model: 'o3-mini',
-        messages: conversation
-      });
-
-      let response = currentMessage.data.choices[0].message;
-
-      // Parse the response
-      console.log('[COMPOSER] Agent completed task, parsing response');
-      let composedContent;
-      try {
-        composedContent = JSON.parse(response.content);
-        console.log('[COMPOSER] Successfully parsed response');
-      } catch (error) {
-        console.error('[COMPOSER] Error parsing response:', error);
-        console.error('[COMPOSER] Raw response:', response.content);
-        throw new Error('Invalid JSON response from agent');
-      }
-
-      // Generate images based on alt text
-      console.log('[COMPOSER] Starting image generation phase');
-      const enhancedContent = await this.generateImagesForContent(composedContent);
+      // Now generate the final HTML with WordPress image URLs
+      console.log('[COMPOSER] Generating final HTML with WordPress image URLs');
+      const finalContent = await this.generateFinalHtml(contentJson, wordpressImages);
 
       return {
         success: true,
-        ...enhancedContent
+        ...finalContent
       };
 
     } catch (error) {
@@ -103,102 +34,163 @@ IMPORTANT:
     }
   }
 
-  async generateImagesForContent(content) {
-    try {
-      console.log('[COMPOSER] Generating images for content');
-      const generatedImages = [];
+  async generateInitialStructure(contentJson) {
+    const conversation = [
+      {
+        role: 'assistant',
+        content: `You are an expert content planner. Your task is to analyze the content and plan the required images.
 
-      // Process each image placeholder
-      for (const image of content.images) {
-        console.log('[COMPOSER] Generating image from alt text:', image.alt);
-
-        // Log image generation request
-        const logEntry = {
-          timestamp: new Date().toISOString(),
-          event: 'image_generation_request',
-          prompt: image.alt,
-          size: '1024x1024'
-        };
-
-        await contentStorage.storeContent(
-          `seo/logs/image_generation/${new Date().toISOString().split('T')[0]}/requests.json`,
-          logEntry,
-          {
-            type: 'image_generation_log',
-            timestamp: logEntry.timestamp
-          }
-        );
-
-        // Generate image using the alt text as prompt
-        const imageResult = await openaiService.generateImage(image.alt);
-        console.log('[COMPOSER] Image generated:', imageResult.url);
-
-        // Log successful generation
-        const successLogEntry = {
-          ...logEntry,
-          event: 'image_generation_success',
-          url: imageResult.url
-        };
-
-        await contentStorage.storeContent(
-          `seo/logs/image_generation/${new Date().toISOString().split('T')[0]}/success.json`,
-          successLogEntry,
-          {
-            type: 'image_generation_log',
-            timestamp: new Date().toISOString()
-          }
-        );
-
-        // Add generated image to the list
-        generatedImages.push({
-          url: imageResult.url,
-          alt: image.alt
-        });
-      }
-
-      // Replace placeholder images with generated ones
-      content.images = generatedImages;
-
-      // Log generation summary
-      const summaryLogEntry = {
-        timestamp: new Date().toISOString(),
-        event: 'image_generation_summary',
-        total_images_generated: generatedImages.length,
-        images: generatedImages
-      };
-
-      await contentStorage.storeContent(
-        `seo/logs/image_generation/${new Date().toISOString().split('T')[0]}/summary.json`,
-        summaryLogEntry,
-        {
-          type: 'image_generation_summary',
-          timestamp: summaryLogEntry.timestamp
-        }
-      );
-
-      return content;
-    } catch (error) {
-      // Log error
-      const errorLogEntry = {
-        timestamp: new Date().toISOString(),
-        event: 'image_generation_error',
-        error: {
-          message: error.message,
-          stack: error.stack
-        }
-      };
-
-      await contentStorage.storeContent(
-        `seo/logs/image_generation/${new Date().toISOString().split('T')[0]}/errors.json`,
-        errorLogEntry,
-        {
-          type: 'image_generation_error',
-          timestamp: errorLogEntry.timestamp
-        }
-      );
-
-      throw error;
+CRITICAL: Return ONLY a valid JSON object with EXACTLY these fields:
+{
+  "title": "Post title",
+  "slug": "url-friendly-slug",
+  "meta": {
+    "title": "SEO title",
+    "description": "Meta description",
+    "focus_keyword": "primary keyword"
+  },
+  "images": [
+    {
+      "type": "featured", // or "content"
+      "alt": "Detailed description for image generation",
+      "section": "Section name or position where image will be used"
     }
+  ]
+}
+
+Image Planning Requirements:
+1. Featured image MUST be first in the images array
+2. Plan 3-4 strategic content images
+3. Write detailed alt text that can be used as DALL-E prompts
+4. Indicate where each image will be placed`
+      },
+      {
+        role: 'user',
+        content: `Plan the image structure for this content:
+${JSON.stringify(contentJson, null, 2)}
+
+IMPORTANT:
+- Return ONLY valid JSON
+- Include detailed image descriptions
+- Plan strategic image placement`
+      }
+    ];
+
+    const response = await openaiService.openai.createChatCompletion({
+      model: 'o3-mini',
+      messages: conversation
+    });
+
+    return JSON.parse(response.data.choices[0].message.content);
+  }
+
+  async generateAndUploadImages(imagePlans) {
+    const uploadedImages = [];
+
+    for (const imagePlan of imagePlans) {
+      try {
+        // Generate image using DALL-E
+        console.log('[COMPOSER] Generating image:', imagePlan.alt);
+        const imageResult = await openaiService.generateImage(imagePlan.alt);
+
+        // Upload to WordPress
+        console.log('[COMPOSER] Uploading image to WordPress');
+        const uploadResult = await wordpressService.uploadImage(imageResult.url);
+
+        uploadedImages.push({
+          ...imagePlan,
+          url: uploadResult.url,
+          wordpress_id: uploadResult.id,
+          wordpress_url: uploadResult.source_url
+        });
+
+        // Log successful upload
+        await this.logImageOperation('success', imagePlan, uploadResult);
+      } catch (error) {
+        console.error('[COMPOSER] Error with image:', error);
+        await this.logImageOperation('error', imagePlan, error);
+        // Continue with other images even if one fails
+      }
+    }
+
+    return uploadedImages;
+  }
+
+  async generateFinalHtml(contentJson, wordpressImages) {
+    const conversation = [
+      {
+        role: 'assistant',
+        content: `You are an expert WordPress content composer. Create HTML content using the provided WordPress image URLs.
+
+CRITICAL: Return ONLY a valid JSON object with EXACTLY these fields:
+{
+  "title": "Post title",
+  "slug": "url-friendly-slug",
+  "meta": {
+    "title": "SEO title",
+    "description": "Meta description",
+    "focus_keyword": "primary keyword"
+  },
+  "content": {
+    "html": "Full HTML content with WordPress image URLs"
+  }
+}
+
+IMPORTANT:
+- The provided WordPress image URLs are already uploaded and ready to use
+- Use the URLs directly in the HTML content
+- NO separate images array needed - embed URLs directly in HTML
+- Create semantic HTML structure
+- Include schema.org markup
+- Optimize for SEO`
+      },
+      {
+        role: 'user',
+        content: `Create the final HTML using these WordPress images:
+${JSON.stringify(wordpressImages, null, 2)}
+
+Original content:
+${JSON.stringify(contentJson, null, 2)}
+
+IMPORTANT:
+- Use the WordPress image URLs (wordpress_url) directly in the HTML
+- Create semantic HTML structure
+- Include schema.org markup
+- Optimize for SEO
+- NO separate images array needed`
+      }
+    ];
+
+    const response = await openaiService.openai.createChatCompletion({
+      model: 'o3-mini',
+      messages: conversation
+    });
+
+    return JSON.parse(response.data.choices[0].message.content);
+  }
+
+  async logImageOperation(status, imagePlan, result) {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      status,
+      image_plan: imagePlan,
+      result: status === 'success' ? {
+        wordpress_id: result.id,
+        wordpress_url: result.source_url
+      } : {
+        error: result.message,
+        details: result.response?.data
+      }
+    };
+
+    await contentStorage.storeContent(
+      `seo/logs/image_operations/${new Date().toISOString().split('T')[0]}/${status}.json`,
+      logEntry,
+      {
+        type: 'image_operation_log',
+        timestamp: logEntry.timestamp
+      }
+    );
   }
 }
 
