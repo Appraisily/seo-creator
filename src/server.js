@@ -1,7 +1,7 @@
 const app = require('./app');
 const { port } = require('./config');
 const sheetsService = require('./services/sheets.service');
-const wordpressService = require('./services/wordpress.service');
+const wordpressService = require('./services/wordpress');
 const openaiService = require('./services/openai.service');
 const contentStorage = require('./utils/storage');
 

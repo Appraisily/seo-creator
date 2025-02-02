@@ -116,6 +116,44 @@ class SheetsService {
       throw error;
     }
   }
+
+  async findKeywordRow(keyword) {
+    if (!this.isConnected) {
+      throw new Error('Google Sheets connection not initialized');
+    }
+    
+    try {
+      // Get all rows from the SEO sheet
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.sheetsId,
+        range: 'SEO!A:C', // Columns: Keywords, Processed Date, Status
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length <= 1) { // Only headers or empty
+        console.log('[SHEETS] No keywords found in sheet');
+        return null;
+      }
+
+      // Find the row with matching keyword
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (row[0]?.trim().toLowerCase() === keyword.toLowerCase()) {
+          console.log('[SHEETS] Found keyword in row:', i + 1);
+          return {
+            keyword: row[0]?.trim() || '',
+            rowNumber: i + 1 // Actual spreadsheet row number (1-based)
+          };
+        }
+      }
+
+      console.log('[SHEETS] Keyword not found in sheet');
+      return null;
+    } catch (error) {
+      console.error('[SHEETS] Error finding keyword row:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new SheetsService();
