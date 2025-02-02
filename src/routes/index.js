@@ -7,7 +7,6 @@ const router = express.Router();
 // Content generation endpoints
 router.post('/process', contentController.processContent.bind(contentController));
 router.post('/generate-content', contentController.generateContent.bind(contentController));
-router.post('/compose-html', contentController.composeHtml.bind(contentController));
 
 // Complete SEO post creation endpoint
 router.post('/create-seo-post', contentController.createSeoPost.bind(contentController));

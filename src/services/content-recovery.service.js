@@ -1,8 +1,13 @@
 const sheetsService = require('./sheets.service');
 const wordpressService = require('./wordpress');
+const ContentGenerationService = require('./content-generation.service');
 const contentStorage = require('../utils/storage');
 
 class ContentRecoveryService {
+  constructor() {
+    this.generationService = new ContentGenerationService();
+  }
+
   async recoverPost(date, keyword) {
     console.log('[CONTENT] Starting recovery process for:', { date, keyword });
 
@@ -11,65 +16,43 @@ class ContentRecoveryService {
       throw new Error('WordPress service is not initialized. Please try again later.');
     }
 
-    // Get composed content
-    const composedContent = await this.getComposedContent(keyword);
-
     // Get sheets data
     const sheetsData = await this.getSheetsData(keyword);
 
     try {
-      // Attempt WordPress post creation
-      console.log('[CONTENT] Attempting WordPress post creation');
-      const wordpressResult = await wordpressService.createPost(composedContent);
+      // Step 1: Generate initial structure with image requirements
+      console.log('[CONTENT] Regenerating content structure');
+      const structure = await this.generationService.generateInitialStructure(keyword);
+
+      // Step 2: Generate and upload images
+      console.log('[CONTENT] Regenerating and uploading images');
+      const images = await this.generationService.generateAndUploadImages(structure);
+
+      // Step 3: Generate detailed content with image URLs
+      console.log('[CONTENT] Regenerating content with images');
+      const content = await this.generationService.generateDetailedContent(structure, images);
+
+      // Step 4: Create WordPress post
+      console.log('[CONTENT] Creating WordPress post');
+      const wordpressResult = await wordpressService.createPost(content);
 
       // Update sheets if we found the row
       if (sheetsData) {
         await sheetsService.markPostAsProcessed(sheetsData, 'success');
       }
 
+      // Store recovery result for logging
+      await this.storeRecoveryResult(date, keyword, {
+        structure,
+        content,
+        wordpress: wordpressResult
+      });
+
       return this.createSuccessResponse(keyword, wordpressResult);
 
     } catch (error) {
       await this.handleError(error, sheetsData, date, keyword);
       throw error;
-    }
-  }
-
-  async getComposedContent(keyword) {
-    const slug = keyword.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    // Try multiple possible paths
-    const paths = [
-      `seo/keywords/${slug}/composed.json`,
-      `seo/posts/${slug}/composed.json`,
-      `seo/content/${slug}/composed.json`
-    ];
-    
-    try {
-      let content = null;
-      let foundPath = null;
-
-      // Try each path until we find the content
-      for (const path of paths) {
-        try {
-          console.log('[CONTENT] Trying path:', path);
-          content = await contentStorage.getContent(path);
-          foundPath = path;
-          break;
-        } catch (error) {
-          console.log('[CONTENT] Content not found at:', path);
-          continue;
-        }
-      }
-
-      if (!content) {
-        throw new Error(`Content not found in any expected location for keyword: ${keyword}`);
-      }
-
-      console.log('[CONTENT] Found composed content at:', foundPath);
-      return content;
-    } catch (error) {
-      console.error('[CONTENT] Error retrieving composed content:', error);
-      throw new Error(`Could not find composed content for recovery: ${error.message}`);
     }
   }
 
@@ -84,10 +67,32 @@ class ContentRecoveryService {
     return sheetsData;
   }
 
+  async storeRecoveryResult(date, keyword, data) {
+    const recoveryLog = {
+      timestamp: new Date().toISOString(),
+      keyword,
+      date,
+      recovery_type: 'regenerate',
+      structure: data.structure,
+      wordpress_result: {
+        id: data.wordpress.wordpress_id,
+        url: data.wordpress.wordpress_url,
+        created_at: data.wordpress.created_at
+      }
+    };
+
+    await contentStorage.storeContent(
+      `seo/logs/recovery/${date}/success.json`,
+      recoveryLog,
+      { type: 'recovery_success', keyword }
+    );
+  }
+
   createSuccessResponse(keyword, wordpressResult) {
     const response = {
       success: true,
       recovered: true,
+      recovery_type: 'regenerate',
       keyword,
       wordpress_id: wordpressResult.wordpress_id,
       wordpress_url: wordpressResult.wordpress_url,
@@ -99,7 +104,7 @@ class ContentRecoveryService {
   }
 
   async handleError(error, sheetsData, date, keyword) {
-    console.error('[CONTENT] Recovery failed at WordPress creation:', error);
+    console.error('[CONTENT] Recovery failed:', error);
     
     // Update sheets if we found the row
     if (sheetsData) {
@@ -110,6 +115,7 @@ class ContentRecoveryService {
     const errorLog = {
       timestamp: new Date().toISOString(),
       keyword,
+      recovery_type: 'regenerate',
       error: {
         message: error.message,
         stack: error.stack,

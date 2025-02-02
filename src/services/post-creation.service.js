@@ -11,12 +11,10 @@ class PostCreationService {
   async createPost() {
     console.log('[CONTENT] Starting complete SEO post creation process');
 
-    // Check if WordPress service is initialized
     if (!wordpressService.isInitialized) {
       throw new Error('WordPress service is not initialized. Please try again later.');
     }
 
-    // Step 1: Get next keyword from sheets
     console.log('[CONTENT] Fetching next unprocessed keyword');
     const keywordData = await sheetsService.getNextUnprocessedPost();
     
@@ -31,27 +29,28 @@ class PostCreationService {
     const keyword = keywordData.keyword;
     console.log('[CONTENT] Processing keyword:', keyword);
 
+    let structure, content, composedContent, wordpressResult;
+
     try {
       // Store pre-creation state
       await this.storePreCreationState(keyword);
 
-      // Step 2: Generate initial structure and content
-      const initialStructure = await this.generationService.generateInitialStructure(keyword);
-      await this.storeStructure(initialStructure, keyword);
+      // Step 1: Generate initial structure with image requirements
+      structure = await this.generationService.generateInitialStructure(keyword);
+      await this.storeStructure(structure, keyword);
 
-      // Step 3: Generate detailed content
-      const detailedContent = await this.generationService.generateDetailedContent(initialStructure);
-      await this.storeContent(initialStructure.slug, detailedContent, keyword);
+      // Step 2: Generate and upload images
+      const images = await this.generationService.generateAndUploadImages(structure);
 
-      // Step 4: Compose final HTML with images
-      const composedContent = await this.generationService.composeHtml(keyword);
-      await this.storeComposedContent(initialStructure.slug, composedContent, keyword);
+      // Step 3: Generate detailed content with image URLs
+      content = await this.generationService.generateDetailedContent(structure, images);
+      await this.storeContent(structure.slug, content, keyword);
 
-      // Step 5: Create WordPress post
+      // Step 4: Create WordPress post
       console.log('[CONTENT] Creating WordPress post');
-      const wordpressResult = await wordpressService.createPost(composedContent);
+      wordpressResult = await wordpressService.createPost(content);
 
-      // Step 6: Mark as processed in sheets
+      // Step 5: Mark as processed in sheets
       await sheetsService.markPostAsProcessed(keywordData, 'success');
 
       return this.createSuccessResponse(keyword, wordpressResult);

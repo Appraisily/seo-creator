@@ -27,7 +27,6 @@ class ContentController {
   async generateContent(req, res) {
     try {
       const { keyword } = req.body;
-      
       if (!keyword) {
         return res.status(400).json({
           success: false,
@@ -39,32 +38,6 @@ class ContentController {
       return res.json({ success: true, content });
     } catch (error) {
       console.error('[CONTENT] Error generating content:', error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-        details: error.response?.data
-      });
-    }
-  }
-
-  async composeHtml(req, res) {
-    try {
-      const { keyword } = req.body;
-      
-      if (!keyword) {
-        return res.status(400).json({
-          success: false,
-          error: 'Keyword is required'
-        });
-      }
-
-      const composedContent = await this.generationService.composeHtml(keyword);
-      return res.json({
-        success: true,
-        content: composedContent
-      });
-    } catch (error) {
-      console.error('[CONTENT] Error composing HTML:', error);
       res.status(500).json({
         success: false,
         error: error.message,

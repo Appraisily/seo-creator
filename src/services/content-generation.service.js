@@ -6,27 +6,9 @@ class ContentGenerationService {
   async generateContent(keyword) {
     console.log('[CONTENT] Generating content for keyword:', keyword);
     
-    // Step 1: Generate initial structure
     const structure = await this.generateInitialStructure(keyword);
-    
-    // Step 2: Generate and upload images
     const images = await this.generateAndUploadImages(structure);
-    
-    // Step 3: Generate detailed content with image URLs
     const content = await this.generateDetailedContent(structure, images);
-    
-    return content;
-  }
-
-  async composeHtml(keyword) {
-    console.log('[CONTENT] Composing HTML for keyword:', keyword);
-    
-    // Create slug from keyword
-    const slug = keyword.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    
-    // Get the content JSON
-    const contentPath = `seo/keywords/${slug}/content.json`;
-    const content = await contentStorage.getContent(contentPath);
     
     return content;
   }
