@@ -37,15 +37,39 @@ class ContentRecoveryService {
 
   async getComposedContent(keyword) {
     const slug = keyword.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    const composedPath = `seo/keywords/${slug}/composed.json`;
+    // Try multiple possible paths
+    const paths = [
+      `seo/keywords/${slug}/composed.json`,
+      `seo/posts/${slug}/composed.json`,
+      `seo/content/${slug}/composed.json`
+    ];
     
     try {
-      const content = await contentStorage.getContent(composedPath);
-      console.log('[CONTENT] Found composed content');
+      let content = null;
+      let foundPath = null;
+
+      // Try each path until we find the content
+      for (const path of paths) {
+        try {
+          console.log('[CONTENT] Trying path:', path);
+          content = await contentStorage.getContent(path);
+          foundPath = path;
+          break;
+        } catch (error) {
+          console.log('[CONTENT] Content not found at:', path);
+          continue;
+        }
+      }
+
+      if (!content) {
+        throw new Error(`Content not found in any expected location for keyword: ${keyword}`);
+      }
+
+      console.log('[CONTENT] Found composed content at:', foundPath);
       return content;
     } catch (error) {
-      console.error('[CONTENT] Could not find composed content:', error);
-      throw new Error('Could not find composed content for recovery');
+      console.error('[CONTENT] Error retrieving composed content:', error);
+      throw new Error(`Could not find composed content for recovery: ${error.message}`);
     }
   }
 
