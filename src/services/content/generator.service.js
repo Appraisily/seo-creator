@@ -8,7 +8,7 @@ class ContentGeneratorService {
     const messages = [
       {
         role: 'assistant',
-        content: `You are an expert SEO content writer. Create detailed content following the provided structure and integrate the provided WordPress images. You MUST return a valid JSON object.
+        content: `You are an expert SEO content writer. Create detailed content following the provided structure and integrate the provided WordPress images. Make a beautiful, attractive post design. You MUST return a valid JSON object.
 
 CRITICAL FORMATTING RULES:
 1. Return ONLY a JSON object
