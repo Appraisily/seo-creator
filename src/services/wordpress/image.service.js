@@ -26,8 +26,8 @@ class WordPressImageService {
       const formData = new FormData();
       formData.append('file', new Blob([buffer]), filename);
 
-      // Upload to WordPress with proper error handling
-      const response = await client.request('post', '/wp/v2/media', formData, {
+      // Upload to WordPress using the correct endpoint
+      const response = await client.request('post', '/media', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
