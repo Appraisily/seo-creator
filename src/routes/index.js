@@ -13,7 +13,7 @@ router.post('/compose-html', contentController.composeHtml.bind(contentControlle
 router.post('/create-seo-post', contentController.createSeoPost.bind(contentController));
 
 // Recovery endpoint for failed WordPress post creation
-router.post('/recover/:date/:keyword', contentController.recoverPostCreation.bind(contentController));
+router.post('/recovery/:date/:keyword', contentController.recoverPostCreation.bind(contentController));
 
 // WordPress test endpoint
 router.post('/test/wordpress', async (req, res) => {
