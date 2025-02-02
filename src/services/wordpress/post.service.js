@@ -13,7 +13,12 @@ class WordPressPostService {
       // Handle featured image
       let featuredImageId = null;
       if (postData.images?.length > 0) {
-        featuredImageId = await imageService.uploadFeaturedImage(postData.images[0].url);
+        const uploadResult = await imageService.uploadFeaturedImage(postData.images[0].url);
+        featuredImageId = uploadResult.id;
+        console.log('[WORDPRESS] Featured image uploaded:', {
+          id: featuredImageId,
+          url: uploadResult.source_url
+        });
       }
 
       // Process content images
@@ -28,18 +33,13 @@ class WordPressPostService {
         slug: postData.slug,
         content: processedHtml,
         status: 'draft',
-        featured_media: featuredImageId ? parseInt(featuredImageId, 10) : null,
+        featured_media: featuredImageId,
         meta: {
           _yoast_wpseo_title: postData.meta.title,
           _yoast_wpseo_metadesc: postData.meta.description,
           _yoast_wpseo_focuskw: postData.meta.focus_keyword
         }
       };
-
-      // Remove featured_media if null to avoid API errors
-      if (!wpPostData.featured_media) {
-        delete wpPostData.featured_media;
-      }
 
       // Create post
       console.log('[WORDPRESS] Sending post creation request');

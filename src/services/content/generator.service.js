@@ -8,34 +8,45 @@ class ContentGeneratorService {
     const messages = [
       {
         role: 'assistant',
-        content: `You are an expert SEO content writer. Create detailed content following the provided structure and integrate the provided WordPress images. Make a beautiful, attractive post design. You MUST return a valid JSON object.
+        content: `You are an expert SEO content writer. Create comprehensive, high-quality content that fully addresses user intent for the given topic. Your content should be detailed, well-structured, and optimized for both users and search engines.
 
-CRITICAL FORMATTING RULES:
-1. Return ONLY a JSON object
-2. NO markdown code blocks
-3. NO extra text before or after the JSON
-4. Properly escape all quotes and special characters
-5. Use double quotes for all keys and string values
+CRITICAL REQUIREMENTS:
+1. Create long-form, authoritative content
+2. Use proper HTML semantic structure
+3. Include schema.org markup
+4. Integrate provided WordPress images naturally
+5. Optimize for featured snippets
+6. Include clear calls-to-action
 
-Example of EXACT format required:
+Your response must be a valid JSON object with these fields:
 {
-  "title": "Example Title",
-  "slug": "example-slug",
+  "title": "SEO-optimized title",
+  "slug": "url-friendly-slug",
   "meta": {
-    "title": "SEO Title",
-    "description": "Meta Description",
-    "focus_keyword": "keyword"
+    "title": "SEO meta title",
+    "description": "Meta description with call-to-action",
+    "focus_keyword": "primary keyword"
   },
   "content": {
-    "html": "<article><h1>Title</h1></article>"
+    "html": "Full HTML content with integrated WordPress image URLs"
   }
 }
 
-CRITICAL: Return ONLY a valid JSON object with EXACTLY these fields:`
+IMPORTANT HTML GUIDELINES:
+1. Use semantic HTML5 elements (article, section, header, etc.)
+2. Create proper heading hierarchy (h1-h6)
+3. Include schema.org markup in script tags
+4. Format images with proper classes:
+   <img src="[url]" alt="[alt]" class="wp-image aligncenter" style="max-width: 800px; height: auto;">
+5. Add descriptive captions under images
+6. Include table of contents for long content
+7. Use proper formatting for lists, quotes, and tables
+
+Return ONLY valid JSON with no additional text or formatting.`
       },
       {
         role: 'user',
-        content: `Create detailed content following this structure and integrate these WordPress images. Return ONLY a valid JSON object:
+        content: `Create comprehensive content using these WordPress images. Return ONLY a valid JSON object:
 
 Structure:
 ${JSON.stringify(structure, null, 2)}
@@ -44,11 +55,11 @@ Available Images:
 ${JSON.stringify(images, null, 2)}
 
 IMPORTANT:
-- Return ONLY valid JSON
-- NO code blocks or extra text
-- Use double quotes for all strings
-- Properly escape special characters
-- Include WordPress image URLs in the HTML content`
+- Create detailed, valuable content
+- Use proper HTML structure
+- Integrate images naturally
+- Include schema.org markup
+- Focus on user intent and value`
       }
     ];
 
@@ -62,7 +73,9 @@ IMPORTANT:
     console.log('[CONTENT] Sending request to OpenAI');
     const completion = await openaiService.openai.createChatCompletion({
       model: 'o3-mini',
-      messages
+      messages,
+      temperature: 0.7, // Add some creativity while maintaining quality
+      max_tokens: 4000  // Allow for longer content
     });
 
     // Store raw OpenAI response
@@ -147,6 +160,11 @@ IMPORTANT:
         throw new Error('Invalid content: missing or invalid meta title');
       }
 
+      // Process image sizes and formatting
+      if (images && images.length > 0) {
+        parsedContent.content.html = this.processImageFormatting(parsedContent.content.html);
+      }
+
       // Store successful parsed content
       await contentStorage.storeContent(
         `seo/keywords/${structure.slug}/parsed_content.json`,
@@ -177,6 +195,14 @@ IMPORTANT:
 
       throw error;
     }
+  }
+
+  processImageFormatting(html) {
+    // Add proper image formatting and responsive classes
+    return html.replace(
+      /<img([^>]*)>/g,
+      '<img$1 class="wp-image aligncenter" style="max-width: 800px; height: auto;">'
+    );
   }
 }
 

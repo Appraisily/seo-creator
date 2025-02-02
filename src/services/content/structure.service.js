@@ -6,52 +6,55 @@ class ContentStructureService {
     const messages = [
       {
         role: 'assistant',
-        content: `You are an expert SEO content planner. Create a content structure and image requirements for the given keyword.
+        content: `You are an expert SEO content planner. Analyze the keyword and create an optimal content structure that best serves user intent.
 
-CRITICAL: Return ONLY a valid JSON object with EXACTLY these fields:
+Your response must be a valid JSON object. The only strictly required field is the "images" array which must follow this format:
+
 {
-  "title": "SEO-optimized title",
-  "slug": "url-friendly-slug",
-  "meta": {
-    "title": "SEO meta title",
-    "description": "Meta description with call-to-action",
-    "focus_keyword": "primary keyword"
-  },
-  "outline": [
-    {
-      "type": "section",
-      "title": "Section title",
-      "key_points": ["point 1", "point 2"]
-    }
-  ],
+  ... (structure the content however you think best serves the user) ...
+
   "images": [
     {
-      "type": "featured",
-      "description": "Detailed description for DALL-E",
+      "type": "featured | content",
+      "description": "Detailed description for DALL-E image generation",
       "alt": "SEO-optimized alt text",
-      "placement": "Featured image position"
-    },
-    {
-      "type": "content",
-      "description": "Detailed description for DALL-E",
-      "alt": "SEO-optimized alt text",
-      "placement": "After introduction"
+      "placement": "Where this image should appear in the content"
     }
   ]
-}`
+}
+
+IMPORTANT GUIDELINES:
+1. Analyze User Intent:
+   - Understand what users are looking for
+   - Consider search context and user needs
+   - Plan content that fully addresses the topic
+
+2. Content Organization:
+   - Structure content in the most logical way
+   - Include all necessary sections
+   - Use clear hierarchical organization
+
+3. Image Planning:
+   - Plan strategic image placement
+   - Write detailed DALL-E prompts
+   - Ensure images enhance content value
+
+4. SEO Optimization:
+   - Include SEO metadata
+   - Use proper content hierarchy
+   - Plan for featured snippets
+
+Return ONLY valid JSON with no additional text or formatting.`
       },
       {
         role: 'user',
-        content: `Create a content structure for the keyword: "${keyword}"
+        content: `Create an optimal content structure for: "${keyword}"
 
 IMPORTANT:
-- Return ONLY valid JSON
-- Create compelling titles
-- Include clear sections
-- Plan strategic image placement
-- Write detailed image descriptions
-- Focus on user intent
-- Optimize for SEO`
+- Return valid JSON
+- Structure based on user intent
+- Include required images array
+- Focus on value and comprehensiveness`
       }
     ];
 
@@ -61,6 +64,11 @@ IMPORTANT:
     });
 
     const structure = JSON.parse(completion.data.choices[0].message.content);
+
+    // Validate required images array
+    if (!structure.images || !Array.isArray(structure.images)) {
+      throw new Error('Invalid structure: missing or invalid images array');
+    }
 
     // Store the structure
     await contentStorage.storeContent(
