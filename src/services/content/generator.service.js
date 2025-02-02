@@ -72,25 +72,57 @@ IMPORTANT:
       { type: 'openai_response' }
     );
 
-    const rawContent = completion.data.choices[0].message.content;
+    let rawContent = completion.data.choices[0].message.content;
 
     // Store raw content before parsing
     await contentStorage.storeContent(
       `seo/keywords/${structure.slug}/raw_content.json`,
-      { content: rawContent },
+      { 
+        content: rawContent,
+        timestamp: new Date().toISOString()
+      },
       { type: 'raw_content' }
     );
 
     try {
+      // Store pre-cleaning state
+      await contentStorage.storeContent(
+        `seo/keywords/${structure.slug}/pre_cleaning.json`,
+        {
+          original: rawContent,
+          timestamp: new Date().toISOString()
+        },
+        { type: 'pre_cleaning_content' }
+      );
+
       // Enhanced cleaning of the response
-      const cleanedContent = rawContent
+      let cleanedContent = rawContent
         .replace(/^[\s\S]*?{/, '{')  // Remove everything before first {
         .replace(/}[\s\S]*$/, '}')   // Remove everything after last }
-        .replace(/\\n/g, '\\n')      // Escape newlines properly
-        .replace(/\\"/g, '\\"')      // Escape quotes properly
-        .replace(/`/g, "'")          // Replace backticks with single quotes
-        .replace(/\t/g, '    ')      // Replace tabs with spaces
+        .replace(/\n/g, ' ')         // Replace newlines with spaces
+        .replace(/\r/g, ' ')         // Replace carriage returns with spaces
+        .replace(/\t/g, ' ')         // Replace tabs with spaces
+        .replace(/\\/g, '\\\\')      // Escape backslashes first
+        .replace(/"/g, '\\"')        // Escape quotes
+        .replace(/`/g, '\\"')        // Replace backticks with escaped quotes
+        .replace(/'/g, '\\"')        // Replace single quotes with escaped quotes
+        .replace(/\s+/g, ' ')        // Normalize whitespace
         .trim();
+
+      // Ensure the content starts with { and ends with }
+      if (!cleanedContent.startsWith('{') || !cleanedContent.endsWith('}')) {
+        throw new Error('Invalid JSON structure: must start with { and end with }');
+      }
+
+      // Store post-cleaning state
+      await contentStorage.storeContent(
+        `seo/keywords/${structure.slug}/post_cleaning.json`,
+        {
+          cleaned: cleanedContent,
+          timestamp: new Date().toISOString()
+        },
+        { type: 'post_cleaning_content' }
+      );
 
       console.log('[CONTENT] Attempting to parse cleaned content');
       
@@ -99,16 +131,35 @@ IMPORTANT:
       try {
         parsedContent = JSON.parse(cleanedContent);
       } catch (parseError) {
+        // Get context around the error position
+        const position = parseInt(parseError.message.match(/position (\d+)/)?.[1]);
+        const context = position ? {
+          before: cleanedContent.substring(Math.max(0, position - 50), position),
+          error: cleanedContent.charAt(position),
+          after: cleanedContent.substring(position + 1, position + 50)
+        } : null;
+
         console.error('[CONTENT] Parse error details:', {
           error: parseError.message,
-          position: parseError.message.match(/position (\d+)/)?.[1],
-          snippet: parseError.message.match(/position \d+/) 
-            ? cleanedContent.substring(
-                Math.max(0, parseInt(parseError.message.match(/position (\d+)/)[1]) - 20),
-                parseInt(parseError.message.match(/position (\d+)/)[1]) + 20
-              )
-            : 'No position information'
+          position,
+          context
         });
+
+        // Store parse error details
+        await contentStorage.storeContent(
+          `seo/keywords/${structure.slug}/parse_error.json`,
+          {
+            error: {
+              message: parseError.message,
+              position,
+              context
+            },
+            content: cleanedContent,
+            timestamp: new Date().toISOString()
+          },
+          { type: 'parse_error' }
+        );
+
         throw parseError;
       }
 
