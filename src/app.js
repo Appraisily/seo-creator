@@ -1,7 +1,7 @@
 const express = require('express');
 const routes = require('./routes');
 const sheetsService = require('./services/sheets.service');
-const wordpressService = require('./services/wordpress.service');
+const wordpressService = require('./services/wordpress');
 const openaiService = require('./services/openai.service');
 const contentStorage = require('./utils/storage');
 
