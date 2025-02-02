@@ -1,6 +1,7 @@
 const client = require('./client');
 const postService = require('./post.service');
 const imageService = require('./image.service');
+const { uploadImage } = imageService;
 
 class WordPressService {
   constructor() {
@@ -29,6 +30,11 @@ class WordPressService {
 
   updatePost(postId, data) {
     return postService.updatePost(postId, data);
+  }
+
+  // Image operations
+  uploadImage(imageUrl) {
+    return imageService.uploadFeaturedImage(imageUrl);
   }
 }
 

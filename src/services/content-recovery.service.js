@@ -1,13 +1,11 @@
 const sheetsService = require('./sheets.service');
 const wordpressService = require('./wordpress');
-const ContentGenerationService = require('./content-generation.service');
+const structureService = require('./content/structure.service');
+const imageService = require('./content/image.service');
+const generatorService = require('./content/generator.service');
 const contentStorage = require('../utils/storage');
 
 class ContentRecoveryService {
-  constructor() {
-    this.generationService = new ContentGenerationService();
-  }
-
   async recoverPost(date, keyword) {
     console.log('[CONTENT] Starting recovery process for:', { date, keyword });
 
@@ -22,15 +20,15 @@ class ContentRecoveryService {
     try {
       // Step 1: Generate initial structure with image requirements
       console.log('[CONTENT] Regenerating content structure');
-      const structure = await this.generationService.generateInitialStructure(keyword);
+      const structure = await structureService.generateStructure(keyword);
 
       // Step 2: Generate and upload images
       console.log('[CONTENT] Regenerating and uploading images');
-      const images = await this.generationService.generateAndUploadImages(structure);
+      const images = await imageService.generateAndUploadImages(structure);
 
       // Step 3: Generate detailed content with image URLs
       console.log('[CONTENT] Regenerating content with images');
-      const content = await this.generationService.generateDetailedContent(structure, images);
+      const content = await generatorService.generateContent(structure, images);
 
       // Step 4: Create WordPress post
       console.log('[CONTENT] Creating WordPress post');

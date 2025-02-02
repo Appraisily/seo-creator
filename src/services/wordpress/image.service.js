@@ -7,26 +7,51 @@ class WordPressImageService {
     try {
       console.log('[WORDPRESS] Uploading featured image:', imageUrl);
       
-      // Download image
-      const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-      const buffer = Buffer.from(imageResponse.data, 'binary');
+      // Download image with proper error handling
+      let imageResponse;
+      try {
+        imageResponse = await axios.get(imageUrl, { 
+          responseType: 'arraybuffer',
+          timeout: 10000 // 10 second timeout
+        });
+      } catch (downloadError) {
+        console.error('[WORDPRESS] Error downloading image:', downloadError);
+        throw new Error(`Failed to download image: ${downloadError.message}`);
+      }
 
-      // Upload to WordPress
-      const formData = new FormData();
-      formData.append('file', new Blob([buffer]), 'featured-image.jpg');
+      const buffer = Buffer.from(imageResponse.data, 'binary');
+      const filename = `image-${Date.now()}.jpg`;
       
-      const response = await client.request('post', '/media', formData, {
+      // Create form data for upload
+      const formData = new FormData();
+      formData.append('file', new Blob([buffer]), filename);
+
+      // Upload to WordPress with proper error handling
+      const response = await client.request('post', '/wp/v2/media', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       });
 
-      console.log('[WORDPRESS] Featured image uploaded, ID:', response.id);
-      return response.id;
+      if (!response || !response.id || !response.source_url) {
+        throw new Error('Invalid response from WordPress media upload');
+      }
+
+      console.log('[WORDPRESS] Image uploaded successfully:', {
+        id: response.id,
+        url: response.source_url
+      });
+
+      return {
+        id: response.id,
+        url: response.source_url,
+        source_url: response.source_url
+      };
+
     } catch (error) {
       console.error('[WORDPRESS] Error uploading featured image:', error);
       await this.logImageError(imageUrl, error);
-      return null;
+      throw error;
     }
   }
 

@@ -1,13 +1,11 @@
 const sheetsService = require('./sheets.service');
 const wordpressService = require('./wordpress');
 const contentStorage = require('../utils/storage');
-const ContentGenerationService = require('./content-generation.service');
+const structureService = require('./content/structure.service');
+const imageService = require('./content/image.service');
+const generatorService = require('./content/generator.service');
 
 class PostCreationService {
-  constructor() {
-    this.generationService = new ContentGenerationService();
-  }
-
   async createPost() {
     console.log('[CONTENT] Starting complete SEO post creation process');
 
@@ -36,14 +34,14 @@ class PostCreationService {
       await this.storePreCreationState(keyword);
 
       // Step 1: Generate initial structure with image requirements
-      structure = await this.generationService.generateInitialStructure(keyword);
+      structure = await structureService.generateStructure(keyword);
       await this.storeStructure(structure, keyword);
 
       // Step 2: Generate and upload images
-      const images = await this.generationService.generateAndUploadImages(structure);
+      const images = await imageService.generateAndUploadImages(structure);
 
       // Step 3: Generate detailed content with image URLs
-      content = await this.generationService.generateDetailedContent(structure, images);
+      content = await generatorService.generateContent(structure, images);
       await this.storeContent(structure.slug, content, keyword);
 
       // Step 4: Create WordPress post
