@@ -68,7 +68,10 @@ IMPORTANT:
     // Store raw OpenAI response
     await contentStorage.storeContent(
       `seo/keywords/${structure.slug}/openai_response.json`,
-      completion.data,
+      {
+        response: completion.data,
+        timestamp: new Date().toISOString()
+      },
       { type: 'openai_response' }
     );
 
@@ -77,41 +80,36 @@ IMPORTANT:
     // Store raw content before parsing
     await contentStorage.storeContent(
       `seo/keywords/${structure.slug}/raw_content.json`,
-      { 
-        content: rawContent,
+      {
+        original: rawContent,
         timestamp: new Date().toISOString()
       },
       { type: 'raw_content' }
     );
 
     try {
-      // Store pre-cleaning state
-      await contentStorage.storeContent(
-        `seo/keywords/${structure.slug}/pre_cleaning.json`,
-        {
-          original: rawContent,
-          timestamp: new Date().toISOString()
-        },
-        { type: 'pre_cleaning_content' }
-      );
-
       // Enhanced cleaning of the response
       let cleanedContent = rawContent
-        .replace(/^[\s\S]*?{/, '{')  // Remove everything before first {
-        .replace(/}[\s\S]*$/, '}')   // Remove everything after last }
+        .replace(/^```json\s*/gm, '')  // Remove JSON code block markers at start
+        .replace(/```\s*$/gm, '')      // Remove code block markers at end
+        .replace(/^\s+|\s+$/g, '')     // Trim whitespace
         .trim();
+
+      // Store cleaned content before parsing
+      await contentStorage.storeContent(
+        `seo/keywords/${structure.slug}/cleaned_content.json`,
+        {
+          cleaned: cleanedContent,
+          timestamp: new Date().toISOString()
+        },
+        { type: 'cleaned_content' }
+      );
 
       // Ensure the content starts with { and ends with }
       if (!cleanedContent.startsWith('{') || !cleanedContent.endsWith('}')) {
-        throw new Error('Invalid JSON structure: must start with { and end with }');
+        console.error('[CONTENT] Invalid JSON structure:', cleanedContent);
+        throw new Error('Invalid JSON structure');
       }
-
-      // Store post-cleaning state
-      await contentStorage.storeContent(
-        `seo/keywords/${structure.slug}/post_cleaning.json`,
-        { cleaned: cleanedContent, timestamp: new Date().toISOString() },
-        { type: 'post_cleaning_content' }
-      );
 
       console.log('[CONTENT] Attempting to parse cleaned content');
       
@@ -121,13 +119,15 @@ IMPORTANT:
         parsedContent = JSON.parse(cleanedContent);
       } catch (parseError) {
         console.error('[CONTENT] Parse error:', parseError.message);
+        console.error('[CONTENT] Cleaned content:', cleanedContent);
 
         // Store parse error details
         await contentStorage.storeContent(
           `seo/keywords/${structure.slug}/parse_error.json`,
           {
             error: parseError.message,
-            content: cleanedContent,
+            rawContent,
+            cleanedContent,
             timestamp: new Date().toISOString()
           },
           { type: 'parse_error' }
@@ -159,25 +159,23 @@ IMPORTANT:
       console.error('[CONTENT] Error parsing content:', error);
       console.error('[CONTENT] Raw content:', rawContent);
 
-      // Store error details with more context
+      // Store complete error details
       await contentStorage.storeContent(
         `seo/keywords/${structure.slug}/parsing_error.json`,
         {
           error: {
             message: error.message,
             stack: error.stack,
-            type: error.constructor.name
+            type: error.constructor.name,
+            response: error.response?.data
           },
           rawContent,
-          cleanedContent: rawContent
-            .replace(/^[\s\S]*?{/, '{')
-            .replace(/}[\s\S]*$/, '}')
-            .trim()
+          timestamp: new Date().toISOString()
         },
         { type: 'parsing_error' }
       );
 
-      throw new Error(`Failed to parse content: ${error.message}`);
+      throw error;
     }
   }
 }

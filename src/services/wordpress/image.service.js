@@ -25,6 +25,7 @@ class WordPressImageService {
       // Create form data for upload
       const formData = new FormData();
       formData.append('file', new Blob([buffer]), filename);
+      formData.append('mlo-category', 'seo');
 
       // Upload to WordPress using the correct endpoint
       const response = await client.request('post', '/media', formData, {
