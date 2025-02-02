@@ -73,9 +73,7 @@ IMPORTANT:
     console.log('[CONTENT] Sending request to OpenAI');
     const completion = await openaiService.openai.createChatCompletion({
       model: 'o3-mini',
-      messages,
-      temperature: 0.7, // Add some creativity while maintaining quality
-      max_tokens: 4000  // Allow for longer content
+      messages
     });
 
     // Store raw OpenAI response
