@@ -28,13 +28,18 @@ class WordPressPostService {
         slug: postData.slug,
         content: processedHtml,
         status: 'draft',
-        featured_media: featuredImageId,
+        featured_media: featuredImageId ? parseInt(featuredImageId, 10) : null,
         meta: {
           _yoast_wpseo_title: postData.meta.title,
           _yoast_wpseo_metadesc: postData.meta.description,
           _yoast_wpseo_focuskw: postData.meta.focus_keyword
         }
       };
+
+      // Remove featured_media if null to avoid API errors
+      if (!wpPostData.featured_media) {
+        delete wpPostData.featured_media;
+      }
 
       // Create post
       console.log('[WORDPRESS] Sending post creation request');
