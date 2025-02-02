@@ -99,14 +99,6 @@ IMPORTANT:
       let cleanedContent = rawContent
         .replace(/^[\s\S]*?{/, '{')  // Remove everything before first {
         .replace(/}[\s\S]*$/, '}')   // Remove everything after last }
-        .replace(/\n/g, ' ')         // Replace newlines with spaces
-        .replace(/\r/g, ' ')         // Replace carriage returns with spaces
-        .replace(/\t/g, ' ')         // Replace tabs with spaces
-        .replace(/\\/g, '\\\\')      // Escape backslashes first
-        .replace(/"/g, '\\"')        // Escape quotes
-        .replace(/`/g, '\\"')        // Replace backticks with escaped quotes
-        .replace(/'/g, '\\"')        // Replace single quotes with escaped quotes
-        .replace(/\s+/g, ' ')        // Normalize whitespace
         .trim();
 
       // Ensure the content starts with { and ends with }
@@ -117,43 +109,24 @@ IMPORTANT:
       // Store post-cleaning state
       await contentStorage.storeContent(
         `seo/keywords/${structure.slug}/post_cleaning.json`,
-        {
-          cleaned: cleanedContent,
-          timestamp: new Date().toISOString()
-        },
+        { cleaned: cleanedContent, timestamp: new Date().toISOString() },
         { type: 'post_cleaning_content' }
       );
 
       console.log('[CONTENT] Attempting to parse cleaned content');
       
-      // Try parsing with additional error context
+      // Try parsing the cleaned content
       let parsedContent;
       try {
         parsedContent = JSON.parse(cleanedContent);
       } catch (parseError) {
-        // Get context around the error position
-        const position = parseInt(parseError.message.match(/position (\d+)/)?.[1]);
-        const context = position ? {
-          before: cleanedContent.substring(Math.max(0, position - 50), position),
-          error: cleanedContent.charAt(position),
-          after: cleanedContent.substring(position + 1, position + 50)
-        } : null;
-
-        console.error('[CONTENT] Parse error details:', {
-          error: parseError.message,
-          position,
-          context
-        });
+        console.error('[CONTENT] Parse error:', parseError.message);
 
         // Store parse error details
         await contentStorage.storeContent(
           `seo/keywords/${structure.slug}/parse_error.json`,
           {
-            error: {
-              message: parseError.message,
-              position,
-              context
-            },
+            error: parseError.message,
             content: cleanedContent,
             timestamp: new Date().toISOString()
           },
