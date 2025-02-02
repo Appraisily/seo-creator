@@ -1,10 +1,11 @@
-const ContentGenerationService = require('../services/content-generation.service');
+const structureService = require('../services/content/structure.service');
+const imageService = require('../services/content/image.service');
+const generatorService = require('../services/content/generator.service');
 const ContentRecoveryService = require('../services/content-recovery.service');
 const PostCreationService = require('../services/post-creation.service');
 
 class ContentController {
   constructor() {
-    this.generationService = new ContentGenerationService();
     this.recoveryService = new ContentRecoveryService();
     this.postCreationService = new PostCreationService();
   }
@@ -34,7 +35,15 @@ class ContentController {
         });
       }
 
-      const content = await this.generationService.generateContent(keyword);
+      // Generate structure first
+      const structure = await structureService.generateStructure(keyword);
+
+      // Generate and upload images
+      const images = await imageService.generateAndUploadImages(structure);
+
+      // Generate final content
+      const content = await generatorService.generateContent(structure, images);
+
       return res.json({ success: true, content });
     } catch (error) {
       console.error('[CONTENT] Error generating content:', error);
