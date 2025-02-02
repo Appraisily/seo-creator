@@ -36,7 +36,10 @@ class ContentRecoveryService {
 
       // Update sheets if we found the row
       if (sheetsData) {
-        await sheetsService.markPostAsProcessed(sheetsData, 'success');
+        await sheetsService.markPostAsProcessed({
+          ...sheetsData,
+          wordpressId: wordpressResult.wordpress_id
+        }, 'success');
       }
 
       // Store recovery result for logging

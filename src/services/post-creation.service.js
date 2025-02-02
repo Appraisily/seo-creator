@@ -49,7 +49,10 @@ class PostCreationService {
       wordpressResult = await wordpressService.createPost(content);
 
       // Step 5: Mark as processed in sheets
-      await sheetsService.markPostAsProcessed(keywordData, 'success');
+      await sheetsService.markPostAsProcessed({
+        ...keywordData,
+        wordpressId: wordpressResult.wordpress_id
+      }, 'success');
 
       return this.createSuccessResponse(keyword, wordpressResult);
 

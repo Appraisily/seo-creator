@@ -90,27 +90,28 @@ class SheetsService {
         throw new Error('Row number not provided for keyword update');
       }
 
-      // Prepare values for both processed date (B) and status (C) columns
+      // Prepare values for processed date (B), status (C), and WordPress ID (D) columns
       const processedDate = new Date().toISOString();
       const statusMessage = status === 'success' 
         ? 'Success'
         : `Error: ${error?.message || error || 'Unknown error'}`;
+      const wordpressId = post.wordpressId || '';
 
-      // Update both columns in a single request
+      // Update all columns in a single request
       await this.sheets.spreadsheets.values.batchUpdate({
         spreadsheetId: this.sheetsId,
         requestBody: {
           valueInputOption: 'USER_ENTERED',
           data: [
             {
-              range: `SEO!B${rowNumber}:C${rowNumber}`,
-              values: [[processedDate, statusMessage]]
+              range: `SEO!B${rowNumber}:D${rowNumber}`,
+              values: [[processedDate, statusMessage, wordpressId]]
             }
           ]
         }
       });
       
-      console.log(`[SHEETS] Marked row ${rowNumber} as processed with status: ${status}`);
+      console.log(`[SHEETS] Updated row ${rowNumber} with status: ${status}, WordPress ID: ${wordpressId}`);
     } catch (error) {
       console.error(`[SHEETS] Error marking row as processed:`, error);
       throw error;
