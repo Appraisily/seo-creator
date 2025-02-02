@@ -8,7 +8,7 @@ class ContentGeneratorService {
     const messages = [
       {
         role: 'assistant',
-        content: `You are an expert SEO content writer. Create comprehensive, high-quality content that fully addresses user intent for the given topic. Your content should be detailed, well-structured, and optimized for both users and search engines.
+        content: `You are an expert SEO content writer. Create comprehensive, high-quality content that fully addresses user intent for the given topic.
 
 CRITICAL REQUIREMENTS:
 1. Create long-form, authoritative content
@@ -18,7 +18,7 @@ CRITICAL REQUIREMENTS:
 5. Optimize for featured snippets
 6. Include clear calls-to-action
 
-Your response must be a valid JSON object with these fields:
+Your response must be a valid JSON object with EXACTLY these fields:
 {
   "title": "SEO-optimized title",
   "slug": "url-friendly-slug",
@@ -28,25 +28,29 @@ Your response must be a valid JSON object with these fields:
     "focus_keyword": "primary keyword"
   },
   "content": {
-    "html": "Full HTML content with integrated WordPress image URLs"
+    "html": "COMPLETE HTML CONTENT HERE - ALL HTML MUST BE IN THIS SINGLE FIELD"
   }
 }
 
 IMPORTANT HTML GUIDELINES:
-1. Use semantic HTML5 elements (article, section, header, etc.)
-2. Create proper heading hierarchy (h1-h6)
-3. Include schema.org markup in script tags
-4. Format images with proper classes:
+1. Put ALL HTML content in the content.html field
+2. Use semantic HTML5 elements (article, section, header, etc.)
+3. Create proper heading hierarchy (h1-h6)
+4. Include schema.org markup in script tags
+5. Format images with proper classes:
    <img src="[url]" alt="[alt]" class="wp-image aligncenter" style="max-width: 800px; height: auto;">
-5. Add descriptive captions under images
-6. Include table of contents for long content
-7. Use proper formatting for lists, quotes, and tables
+6. Add descriptive captions under images
+7. Include table of contents for long content
+8. Use proper formatting for lists, quotes, and tables
 
+CRITICAL: DO NOT split content into sections. Put ALL HTML in the content.html field.
 Return ONLY valid JSON with no additional text or formatting.`
       },
       {
         role: 'user',
-        content: `Create comprehensive content using these WordPress images. Return ONLY a valid JSON object:
+        content: `Create comprehensive content using these WordPress images.
+
+CRITICAL: Return ONLY a valid JSON object with ALL HTML in the content.html field.
 
 Structure:
 ${JSON.stringify(structure, null, 2)}
@@ -56,6 +60,7 @@ ${JSON.stringify(images, null, 2)}
 
 IMPORTANT:
 - Create detailed, valuable content
+- Put ALL HTML in content.html field
 - Use proper HTML structure
 - Integrate images naturally
 - Include schema.org markup
@@ -148,15 +153,7 @@ IMPORTANT:
       }
 
       // Validate required fields
-      if (!parsedContent.title || typeof parsedContent.title !== 'string') {
-        throw new Error('Invalid content: missing or invalid title');
-      }
-      if (!parsedContent.content?.html || typeof parsedContent.content.html !== 'string') {
-        throw new Error('Invalid content: missing or invalid HTML content');
-      }
-      if (!parsedContent.meta?.title || typeof parsedContent.meta.title !== 'string') {
-        throw new Error('Invalid content: missing or invalid meta title');
-      }
+      this.validateContent(parsedContent);
 
       // Process image sizes and formatting
       if (images && images.length > 0) {
@@ -201,6 +198,33 @@ IMPORTANT:
       /<img([^>]*)>/g,
       '<img$1 class="wp-image aligncenter" style="max-width: 800px; height: auto;">'
     );
+  }
+
+  validateContent(content) {
+    if (!content.title || typeof content.title !== 'string') {
+      throw new Error('Invalid content: missing or invalid title');
+    }
+
+    if (!content.content?.html || typeof content.content.html !== 'string') {
+      throw new Error('Invalid content: missing or invalid HTML content');
+    }
+    
+    if (!content.meta?.title || typeof content.meta.title !== 'string') {
+      throw new Error('Invalid content: missing or invalid meta title');
+    }
+  }
+
+  stripHtmlTags(html) {
+    return html.replace(/<[^>]*>/g, ' ')
+               .replace(/\s+/g, ' ')
+               .trim();
+  }
+
+  createSlug(title) {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
   }
 }
 
